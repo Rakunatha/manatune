@@ -26,6 +26,7 @@
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
   }
 
+  html,body{height:100%;}
   .layout{display:grid;grid-template-columns:210px 1fr;min-height:100vh;}
 
   /* ---- Sidebar ---- */
@@ -55,7 +56,7 @@
   .nav-icon{width:18px;text-align:center;}
 
   /* ---- Main ---- */
-  .main{padding:28px 34px 100px 34px;overflow-y:auto;min-width:0;}
+  .main{padding:28px 34px 100px 34px;min-width:0;}
   .page{display:none;}
   .page.active{display:block;}
   h1{font-size:24px;margin:0 0 4px 0;}
@@ -135,7 +136,7 @@
     font-size:12px;color:var(--sky);text-decoration:none;font-weight:600;flex:0 0 auto;
   }
   .open-external:hover{text-decoration:underline;}
-  .browser-viewport{min-height:420px;background:var(--bg);}
+  .browser-viewport{min-height:420px;background:var(--bg);overflow-y:visible;}
   .viewport-note{
     padding:8px 14px;font-size:11.5px;color:var(--text-muted);
     background:var(--card);border-bottom:1px solid var(--border);
@@ -336,7 +337,8 @@
     .open-external{order:3;flex:1;text-align:center;}
     .tab-strip{padding:6px 4px 0 4px;}
     .tab{max-width:120px;padding:7px 10px;font-size:12px;}
-    .browser-viewport,.viewport-frame{min-height:280px;height:280px;}
+    .browser-viewport{min-height:280px;}
+    .viewport-frame{min-height:280px;height:280px;}
 
     /* Browse grid: comfortable single/double column on phones */
     .grid{grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));gap:10px;padding:12px;}
