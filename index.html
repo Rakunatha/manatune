@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manatune</title>
+<style>
+  :root{
+    --bg:#0f1114;
+    --sidebar:#000000;
+    --card:#181b20;
+    --card-hover:#22262d;
+    --blue:#2d8cff;
+    --blue-dim:#1a5fb4;
+    --sky:#5cc8ff;
+    --navy:#0a3d91;
+    --text:#ffffff;
+    --text-muted:#a7adb6;
+    --border:#242830;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+
+  .layout{display:grid;grid-template-columns:210px 1fr;min-height:100vh;}
+
+  /* ---- Sidebar ---- */
+  .sidebar{
+    background:var(--sidebar);
+    padding:22px 14px;
+    display:flex;
+    flex-direction:column;
+  }
+  .logo{
+    color:var(--blue);
+    font-size:20px;
+    font-weight:800;
+    letter-spacing:-.02em;
+    margin:0 8px 28px 8px;
+  }
+  .nav-btn{
+    display:flex;align-items:center;gap:12px;
+    background:none;border:none;color:var(--text-muted);
+    font-size:14px;font-weight:600;
+    padding:10px 8px;border-radius:6px;
+    cursor:pointer;text-align:left;width:100%;
+  }
+  .nav-btn:hover{color:var(--text);}
+  .nav-btn.active{color:var(--text);background:var(--card);}
+  .nav-icon{width:18px;text-align:center;}
+
+  /* ---- Main ---- */
+  .main{padding:28px 34px 100px 34px;overflow-y:auto;}
+  .page{display:none;}
+  .page.active{display:block;}
+  h1{font-size:24px;margin:0 0 4px 0;}
+  .subhead{color:var(--text-muted);font-size:13.5px;margin:0 0 26px 0;}
+
+  /* ---- Mini browser (Browse page) ---- */
+  .mini-browser{
+    border:1px solid var(--border);
+    border-radius:8px;
+    overflow:hidden;
+    background:var(--card);
+  }
+  .tab-strip{
+    display:flex;
+    background:#000000;
+    padding:6px 6px 0 6px;
+    gap:4px;
+    overflow-x:auto;
+  }
+  .tab{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 12px;
+    font-size:12.5px;
+    color:var(--text-muted);
+    background:var(--bg);
+    border-radius:6px 6px 0 0;
+    cursor:pointer;
+    white-space:nowrap;
+    max-width:160px;
+  }
+  .tab.active{color:var(--text);background:var(--card);}
+  .tab-close{
+    color:var(--text-muted);
+    font-size:13px;
+    line-height:1;
+    padding:0 2px;
+  }
+  .tab-close:hover{color:var(--text);}
+  .address-bar{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 14px;
+    background:var(--card);
+    border-bottom:1px solid var(--border);
+  }
+  .url-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);flex:0 0 auto;}
+  .address-text{
+    flex:1;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:12.5px;
+    color:var(--text-muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .address-input{
+    flex:1;
+    background:var(--bg);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:16px;
+    padding:7px 14px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:12.5px;
+  }
+  .address-input:focus{outline:1px solid var(--blue);}
+  .go-btn{
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:16px;
+    padding:7px 16px;
+    font-size:12px;
+    font-weight:700;
+    cursor:pointer;
+    flex:0 0 auto;
+  }
+  .go-btn:hover{background:var(--blue-dim);}
+  .open-external{
+    font-size:12px;color:var(--sky);text-decoration:none;font-weight:600;flex:0 0 auto;
+  }
+  .open-external:hover{text-decoration:underline;}
+  .browser-viewport{min-height:420px;background:var(--bg);}
+  .viewport-note{
+    padding:8px 14px;font-size:11.5px;color:var(--text-muted);
+    background:var(--card);border-bottom:1px solid var(--border);
+  }
+  .viewport-frame{width:100%;height:420px;border:none;display:block;}
+
+  /* ---- Browse grid ---- */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));
+    gap:16px;
+    padding:20px;
+  }
+  .app-card{
+    background:var(--card-hover);
+    border-radius:8px;
+    padding:16px;
+    cursor:pointer;
+    transition:background .15s ease, transform .15s ease;
+  }
+  .app-card:hover{background:#2a2f38;transform:translateY(-2px);}
+  .app-cover{
+    width:100%;height:90px;border-radius:6px;margin-bottom:12px;
+  }
+  .app-name{font-size:14.5px;font-weight:700;margin-bottom:4px;}
+  .app-category{font-size:11.5px;color:var(--sky);margin-bottom:6px;}
+  .app-blurb{font-size:12px;color:var(--text-muted);line-height:1.4;}
+
+  /* ---- Track page ---- */
+  .track-form{
+    display:flex;gap:10px;flex-wrap:wrap;
+    background:var(--card);
+    border-radius:8px;
+    padding:16px;
+    margin-bottom:24px;
+    align-items:flex-end;
+  }
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{font-size:11px;color:var(--text-muted);}
+  .field input, .field select{
+    background:#0f1114;
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:5px;
+    padding:9px 10px;
+    font-size:13px;
+    min-width:140px;
+  }
+  .field input:focus, .field select:focus{outline:1px solid var(--blue);}
+  .log-btn{
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:20px;
+    padding:10px 22px;
+    font-weight:700;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .log-btn:hover{background:var(--blue-dim);}
+
+  .event-row{
+    display:grid;
+    grid-template-columns:14px 1fr 1fr 1fr 90px;
+    align-items:center;
+    gap:14px;
+    padding:11px 10px;
+    border-bottom:1px solid var(--border);
+    font-size:13px;
+  }
+  .event-row.head{color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border);}
+  .dot{width:9px;height:9px;border-radius:50%;}
+  .muted{color:var(--text-muted);}
+  .empty{color:var(--text-muted);font-size:13px;padding:20px 0;}
+
+  /* ---- Bottom activity bar ---- */
+  .activity-bar{
+    position:fixed;bottom:0;left:210px;right:0;
+    background:#000000;
+    border-top:1px solid var(--border);
+    padding:10px 24px;
+    display:flex;align-items:center;gap:10px;
+    font-size:12.5px;
+    color:var(--text-muted);
+  }
+  .activity-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--blue);}
+  .activity-bar strong{color:var(--text);font-weight:600;}
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="logo">Manatune</div>
+    <button class="nav-btn active" id="navBrowse" onclick="showPage('browse')">
+      <span class="nav-icon">&#8962;</span> Browse
+    </button>
+    <button class="nav-btn" id="navTrack" onclick="showPage('track')">
+      <span class="nav-icon">&#9776;</span> Track
+    </button>
+  </div>
+
+  <div class="main">
+    <!-- PAGE 1: Browse -->
+    <div class="page active" id="page-browse">
+      <h1>Browse AI apps &amp; platforms</h1>
+      <p class="subhead">A mini browser for the tools people create with. Opening one is tracked automatically.</p>
+
+      <div class="mini-browser">
+        <div class="tab-strip" id="tabStrip"></div>
+        <div class="address-bar">
+          <span class="url-dot" id="urlDot"></span>
+          <input type="text" id="addressInput" class="address-input" placeholder="Enter a URL and press Enter" onkeydown="if(event.key==='Enter') navigateTo()">
+          <button class="go-btn" onclick="navigateTo()">Go</button>
+          <a href="#" id="openExternal" class="open-external" target="_blank" rel="noopener" style="display:none;">Open ↗</a>
+        </div>
+        <div id="viewportNote"></div>
+        <div class="browser-viewport" id="viewport">
+          <div class="grid" id="appsGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 2: Track -->
+    <div class="page" id="page-track">
+      <h1>Track activity</h1>
+      <p class="subhead">Log what's being created, downloaded, and distributed.</p>
+
+      <div class="track-form">
+        <div class="field">
+          <label>ITEM</label>
+          <input type="text" id="fItem" placeholder="e.g. Q3 report">
+        </div>
+        <div class="field">
+          <label>TOOL USED</label>
+          <input type="text" id="fTool" placeholder="e.g. ChatGPT">
+        </div>
+        <div class="field">
+          <label>USER</label>
+          <input type="text" id="fUser" placeholder="You">
+        </div>
+        <div class="field">
+          <label>ACTION</label>
+          <select id="fAction">
+            <option>Created</option>
+            <option>Downloaded</option>
+            <option>Distributed</option>
+          </select>
+        </div>
+        <button class="log-btn" onclick="logEvent()">Log</button>
+      </div>
+
+      <div class="event-row head">
+        <span></span><span>Item</span><span>Tool</span><span>User</span><span>Time</span>
+      </div>
+      <div id="eventsList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="activity-bar" id="activityBar">
+  <span class="dot"></span><span>No activity yet</span>
+</div>
+
+<script>
+const ACTION_COLOR = { Created: 'var(--blue)', Downloaded: 'var(--sky)', Distributed: 'var(--navy)', Visited: 'var(--blue-dim)' };
+const BLUE_SHADES = ['#0a3d91','#1a5fb4','#2d8cff','#5cc8ff','#123a63','#1f6fb2'];
+
+let APPS = [];
+let tabs = [{ id: 'home', title: 'New Tab', url: null }];
+let activeTabId = 'home';
+
+function showPage(name){
+  document.getElementById('page-browse').classList.toggle('active', name==='browse');
+  document.getElementById('page-track').classList.toggle('active', name==='track');
+  document.getElementById('navBrowse').classList.toggle('active', name==='browse');
+  document.getElementById('navTrack').classList.toggle('active', name==='track');
+}
+
+async function loadApps(){
+  const res = await fetch('/api/apps');
+  APPS = await res.json();
+  renderHomeGrid();
+  renderTabStrip();
+  renderAddressBar();
+}
+
+function renderHomeGrid(){
+  const grid = document.getElementById('appsGrid');
+  if(!grid) return;
+  grid.innerHTML = APPS.map((a, i) => `
+    <div class="app-card" onclick="openApp(${i})">
+      <div class="app-cover" style="background:${BLUE_SHADES[i % BLUE_SHADES.length]}"></div>
+      <div class="app-name">${escapeHtml(a.name)}</div>
+      <div class="app-category">${escapeHtml(a.category)}</div>
+      <div class="app-blurb">${escapeHtml(a.blurb)}</div>
+    </div>
+  `).join('');
+}
+
+function openApp(index){
+  const app = APPS[index];
+  openTabForUrl(app.url, app.name);
+}
+
+function normalizeUrl(raw){
+  let url = raw.trim();
+  if(!url) return null;
+  if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  return url;
+}
+
+function titleForUrl(url){
+  const match = APPS.find(a => a.url === url);
+  if(match) return match.name;
+  try{
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch(e){
+    return url;
+  }
+}
+
+function openTabForUrl(url, title){
+  const existing = tabs.find(t => t.url === url);
+  if(existing){
+    activeTabId = existing.id;
+  } else {
+    const tab = { id: 'tab-' + Date.now(), title: title, url: url };
+    tabs.push(tab);
+    activeTabId = tab.id;
+    // visiting a tool — typed or clicked — is itself an event worth tracking
+    fetch('/api/events', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ item: 'Session opened', tool: title, user: 'You', action: 'Visited' })
+    }).then(loadEvents);
+  }
+  renderTabStrip();
+  renderAddressBar();
+  renderViewport();
+}
+
+function navigateTo(){
+  const input = document.getElementById('addressInput');
+  const url = normalizeUrl(input.value);
+  if(!url) return;
+  openTabForUrl(url, titleForUrl(url));
+}
+
+function closeTab(id, evt){
+  if(evt) evt.stopPropagation();
+  tabs = tabs.filter(t => t.id !== id);
+  if(activeTabId === id) activeTabId = 'home';
+  renderTabStrip();
+  renderAddressBar();
+  renderViewport();
+}
+
+function switchTab(id){
+  activeTabId = id;
+  renderTabStrip();
+  renderAddressBar();
+  renderViewport();
+}
+
+function renderTabStrip(){
+  const strip = document.getElementById('tabStrip');
+  if(!strip) return;
+  strip.innerHTML = tabs.map(t => `
+    <div class="tab ${t.id===activeTabId ? 'active' : ''}" onclick="switchTab('${t.id}')">
+      <span>${escapeHtml(t.title)}</span>
+      ${t.id !== 'home' ? `<span class="tab-close" onclick="closeTab('${t.id}', event)">&times;</span>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderAddressBar(){
+  const tab = tabs.find(t => t.id === activeTabId);
+  const input = document.getElementById('addressInput');
+  const openExternal = document.getElementById('openExternal');
+  if(!tab || !tab.url){
+    input.value = '';
+    input.placeholder = 'Enter a URL and press Enter';
+    openExternal.style.display = 'none';
+  } else {
+    input.value = tab.url;
+    openExternal.style.display = 'inline';
+    openExternal.href = tab.url;
+  }
+}
+
+function renderViewport(){
+  const viewport = document.getElementById('viewport');
+  const note = document.getElementById('viewportNote');
+  const tab = tabs.find(t => t.id === activeTabId);
+  if(!tab || !tab.url){
+    note.innerHTML = '';
+    viewport.innerHTML = '<div class="grid" id="appsGrid"></div>';
+    renderHomeGrid();
+  } else {
+    note.innerHTML = `<div class="viewport-note">Some tools block being shown inside another page — if this stays blank, use "Open ↗" above.</div>`;
+    viewport.innerHTML = `<iframe class="viewport-frame" src="${tab.url}"></iframe>`;
+  }
+}
+
+async function loadEvents(){
+  const res = await fetch('/api/events');
+  const events = await res.json();
+  const list = document.getElementById('eventsList');
+  if(events.length === 0){
+    list.innerHTML = '<div class="empty">Nothing logged yet.</div>';
+  } else {
+    list.innerHTML = events.map(e => `
+      <div class="event-row">
+        <span class="dot" style="background:${ACTION_COLOR[e.action] || 'var(--blue)'}"></span>
+        <span>${escapeHtml(e.item)}</span>
+        <span class="muted">${escapeHtml(e.tool)}</span>
+        <span class="muted">${escapeHtml(e.user)}</span>
+        <span class="muted">${escapeHtml(e.timestamp)}</span>
+      </div>
+    `).join('');
+  }
+  if(events.length > 0){
+    const latest = events[0];
+    document.getElementById('activityBar').innerHTML =
+      `<span class="dot" style="background:${ACTION_COLOR[latest.action] || 'var(--blue)'}"></span>
+       <span><strong>${escapeHtml(latest.user)}</strong> ${latest.action.toLowerCase()} <strong>${escapeHtml(latest.item)}</strong> with ${escapeHtml(latest.tool)} &middot; ${latest.timestamp}</span>`;
+  }
+}
+
+async function logEvent(){
+  const item = document.getElementById('fItem').value.trim();
+  const tool = document.getElementById('fTool').value.trim();
+  const user = document.getElementById('fUser').value.trim() || 'You';
+  const action = document.getElementById('fAction').value;
+  if(!item || !tool) return;
+
+  await fetch('/api/events', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({item, tool, user, action})
+  });
+
+  document.getElementById('fItem').value = '';
+  document.getElementById('fTool').value = '';
+  loadEvents();
+}
+
+function escapeHtml(s){
+  return (s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+loadApps();
+loadEvents();
+</script>
+</body>
+</html>
