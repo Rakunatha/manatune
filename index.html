@@ -48,13 +48,14 @@
     font-size:14px;font-weight:600;
     padding:10px 8px;border-radius:6px;
     cursor:pointer;text-align:left;width:100%;
+    min-height:44px;
   }
   .nav-btn:hover{color:var(--text);}
   .nav-btn.active{color:var(--text);background:var(--card);}
   .nav-icon{width:18px;text-align:center;}
 
   /* ---- Main ---- */
-  .main{padding:28px 34px 100px 34px;overflow-y:auto;}
+  .main{padding:28px 34px 100px 34px;overflow-y:auto;min-width:0;}
   .page{display:none;}
   .page.active{display:block;}
   h1{font-size:24px;margin:0 0 4px 0;}
@@ -222,6 +223,109 @@
   }
   .activity-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--blue);}
   .activity-bar strong{color:var(--text);font-weight:600;}
+
+  /* =========================================================
+     RESPONSIVE BREAKPOINTS
+     - Large screens (smart boards / big displays): roomier grid
+     - Tablets (~600-1024px): collapse sidebar to a top bar
+     - Phones (<600px): stacked layout, full-width controls,
+       address bar wraps, event rows become cards
+     ========================================================= */
+
+  /* Large displays / smart boards: give the grid more breathing room */
+  @media (min-width:1400px){
+    .main{padding:36px 56px 110px 56px;}
+    .grid{grid-template-columns:repeat(auto-fill, minmax(210px, 1fr));gap:20px;}
+    h1{font-size:28px;}
+  }
+
+  /* Tablets and small laptops: sidebar becomes a horizontal top bar */
+  @media (max-width:1024px){
+    .layout{grid-template-columns:1fr;}
+    .sidebar{
+      flex-direction:row;
+      align-items:center;
+      padding:12px 16px;
+      gap:6px;
+      position:sticky;top:0;z-index:20;
+    }
+    .logo{margin:0 12px 0 0;font-size:18px;}
+    .nav-btn{width:auto;padding:9px 14px;}
+    .main{padding:20px 20px 90px 20px;}
+    .activity-bar{left:0;}
+  }
+
+  /* Phones and small tablets */
+  @media (max-width:640px){
+    .sidebar{
+      padding:10px 10px;
+      overflow-x:auto;
+      justify-content:flex-start;
+    }
+    .logo{font-size:16px;margin-right:8px;}
+    .nav-btn{font-size:13px;padding:8px 10px;white-space:nowrap;}
+    .main{padding:16px 14px 84px 14px;}
+    h1{font-size:20px;}
+    .subhead{font-size:12.5px;margin-bottom:18px;}
+
+    /* Mini browser: stack address bar controls */
+    .address-bar{flex-wrap:wrap;padding:10px;}
+    .address-input{min-width:0;flex-basis:100%;order:1;}
+    .go-btn{order:2;flex:1;}
+    .open-external{order:3;flex:1;text-align:center;}
+    .tab-strip{padding:6px 4px 0 4px;}
+    .tab{max-width:120px;padding:7px 10px;font-size:12px;}
+    .browser-viewport,.viewport-frame{min-height:280px;height:280px;}
+
+    /* Browse grid: comfortable single/double column on phones */
+    .grid{grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));gap:10px;padding:12px;}
+    .app-cover{height:70px;}
+    .app-name{font-size:13px;}
+    .app-blurb{font-size:11.5px;}
+
+    /* Track form: full-width stacked fields */
+    .track-form{flex-direction:column;align-items:stretch;padding:14px;gap:12px;}
+    .field input, .field select{min-width:0;width:100%;}
+    .log-btn{width:100%;padding:12px 22px;}
+
+    /* Event rows: collapse the table into readable cards */
+    .event-row.head{display:none;}
+    .event-row{
+      grid-template-columns:14px 1fr;
+      grid-template-areas:
+        "dot item"
+        ".   tool"
+        ".   meta";
+      row-gap:4px;
+      padding:12px 8px;
+    }
+    .event-row .dot{grid-area:dot;align-self:start;margin-top:4px;}
+    .event-row span:nth-child(2){grid-area:item;font-weight:600;}
+    .event-row span:nth-child(3){grid-area:tool;}
+    .event-row span:nth-child(4){grid-area:meta;}
+    .event-row span:nth-child(5){grid-area:meta;justify-self:end;margin-top:-18px;}
+
+    .activity-bar{
+      padding:9px 14px;
+      font-size:11.5px;
+      white-space:nowrap;
+      overflow-x:auto;
+    }
+  }
+
+  /* Extra-small phones */
+  @media (max-width:380px){
+    .grid{grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));}
+    .nav-btn span:last-child{display:inline;}
+  }
+
+  /* Touch devices: ensure comfortably tappable targets */
+  @media (pointer:coarse){
+    .go-btn,.log-btn,.nav-btn,.tab,.field input,.field select,.address-input{
+      min-height:40px;
+    }
+    .app-card{padding:14px;}
+  }
 </style>
 </head>
 <body>
