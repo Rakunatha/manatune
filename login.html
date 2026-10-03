@@ -12,9 +12,6 @@ body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--
 .box{width:100%;max-width:380px}
 .logo{color:var(--blue);font-size:30px;font-weight:800;letter-spacing:-.02em;margin-bottom:18px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:20px}
-.tabs{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:8px;margin-bottom:12px}
-.tabs button{flex:1;border:0;background:none;color:var(--mut);font-weight:600;padding:8px;border-radius:6px;cursor:pointer;font-size:13px}
-.tabs button.on{background:var(--blue);color:#fff}
 label{display:block;font-size:12px;color:var(--mut);margin:12px 0 4px}
 input,select{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--bd);border-radius:6px;padding:10px;font:inherit}
 input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
@@ -22,10 +19,8 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outl
 .go:hover{background:var(--blue2)}
 .err{color:var(--bad);margin:0 0 4px}
 .hint{color:var(--mut);font-size:12px;margin:6px 0 0}
-form{display:none}form.on{display:block}
 .g{display:block;text-align:center;text-decoration:none;color:var(--text);background:var(--bg);border:1px solid var(--bd);border-radius:20px;padding:10px;font-weight:700}
 .g:hover{border-color:var(--blue)}
-.or{text-align:center;color:var(--mut);font-size:12px;margin:12px 0}
 </style>
 </head>
 <body>
@@ -33,30 +28,26 @@ form{display:none}form.on{display:block}
   <div class="logo">Manatune</div>
   <div class="card">
     {% for m in get_flashed_messages() %}<p class="err">{{ m }}</p>{% endfor %}
-    {% if google_enabled %}<a class="g" href="/auth/google">Continue with Google</a><div class="or">or use email</div>{% endif %}
-    <div class="tabs">
-      <button type="button" id="b-login" onclick="tab('login')">Sign in</button>
-      <button type="button" id="b-signup" onclick="tab('signup')">Create account</button>
-    </div>
-    <form id="f-login" method="post" action="/login">
-      <label for="le">Email</label><input id="le" name="email" type="email" autocomplete="email" required>
-      <label for="lp">Password</label><input id="lp" name="password" type="password" autocomplete="current-password" required>
-      <button class="go">Sign in</button>
-    </form>
-    <form id="f-signup" method="post" action="/signup">
-      <label for="sn">Name (or firm name)</label><input id="sn" name="name" autocomplete="name" required>
-      <label for="se">Email</label><input id="se" name="email" type="email" autocomplete="email" required>
-      <label for="sp">Password</label><input id="sp" name="password" type="password" minlength="8" autocomplete="new-password" required>
-      <p class="hint">At least 8 characters.</p>
+    {% if mode == 'welcome' %}
+    <form method="post" action="/welcome" style="display:block">
+      <p style="margin:0 0 4px"><b>Welcome, {{ me.name }}.</b></p>
+      <p class="hint" style="margin:0">One quick choice. You can't change this later.</p>
       <label for="sr">I am joining as</label>
-      <select id="sr" name="role"><option value="creator">A creator or music lover</option><option value="advocate">An IP advocate or firm</option></select>
-      <button class="go">Create account</button>
+      <select id="sr" name="role" onchange="document.getElementById('nm').style.display=this.value==='advocate'?'block':'none'">
+        <option value="creator">A creator or music lover</option>
+        <option value="advocate">An IP advocate or firm</option>
+      </select>
+      <div id="nm" style="display:none">
+        <label for="sn">Advocate or firm name</label>
+        <input id="sn" name="name" value="{{ me.name }}">
+      </div>
+      <button class="go">Continue</button>
     </form>
+    {% else %}
+    <a class="g" href="/auth/google">Continue with Google</a>
+    <p class="hint" style="text-align:center;margin-top:12px">Google is the only way to sign in.</p>
+    {% endif %}
   </div>
 </div>
-<script>
-function tab(t){['login','signup'].forEach(function(x){document.getElementById('f-'+x).className=x===t?'on':'';document.getElementById('b-'+x).className=x===t?'on':''})}
-tab('{{ tab }}');
-</script>
 </body>
 </html>
