@@ -76,7 +76,7 @@ const ME={{ me|tojson }};
 const TOOLS=[['ChatGPT','Conversational AI','https://chat.openai.com/'],['Claude','Conversational AI','https://claude.ai/'],['Midjourney','Image generation','https://www.midjourney.com/'],['GitHub Copilot','Code generation','https://github.com/features/copilot'],['ElevenLabs','Voice generation','https://elevenlabs.io/'],['Runway','Video generation','https://runwayml.com/']];
 let ADVOCATES=[];
 const NAV={taste:[['feed','Taste feed'],['browser','Browse & repost']],creator:[['studio','Reaction studio'],['browser','Browser'],['creations','My creations'],['requests','Legal requests']],advocate:[['inbox','Filing inbox']]};
-const MODES=[['taste','Taste'],['creator','Creator']].concat(ME.role==='advocate'?[['advocate','Advocate']]:[]);
+const MODES=[['taste','Taste'],ME.role==='advocate'?['advocate','Advocate']:['creator','Create']];
 const S={mode:ME.role==='advocate'?'advocate':'creator',view:ME.role==='advocate'?'inbox':'studio',tabs:[],active:'home',creations:[],requests:[],reposts:[],msg:''};
 const ZERO='0'.repeat(64);
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(16)+Math.random().toString(16).slice(2);
@@ -217,7 +217,7 @@ function vRequests(){
 }
 function vInbox(){
   let h='<h1>Filing inbox</h1><p class="sub">Requests from creators, each with its evidence pack.</p>';
-  if(!S.requests.length)return h+'<div class="empty">No requests yet. Switch to Creator, log a creation, and send one.</div>';
+  if(!S.requests.length)return h+'<div class="empty">No requests yet. Switch to Create, log a creation, and send one.</div>';
   h+=S.requests.map(r=>{const c=S.creations.find(x=>x.id===r.cid);if(!c)return'';return'<div class="card"><div class="row"><b>'+esc(c.title)+'</b>'+stBadge(r.status)+'<span class="badge">'+esc(r.advocate)+'</span><span class="badge" id="v-'+r.id+'">Checking chain&hellip;</span></div><p><span class="sub">Tool:</span> '+esc(c.tool)+'<br><span class="sub">Prompt:</span> '+esc(c.prompt||'Not provided')+'<br><span class="sub">Human contribution:</span> '+esc(c.human||'Not provided')+'</p><div class="hash">sha256:'+c.contentHash+'</div>'+chainHtml(c)+'<div class="row" style="margin-top:10px"><button class="btn" onclick="setStatus(\''+r.id+'\',\'Accepted\')">Accept</button><button class="btn ghost" onclick="setStatus(\''+r.id+'\',\'Filed\')">Mark as filed</button><button class="btn bad" onclick="setStatus(\''+r.id+'\',\'Declined\')">Decline</button></div></div>'}).join('');
   setTimeout(()=>S.requests.forEach(async r=>{const c=S.creations.find(x=>x.id===r.cid);if(!c)return;const ok=await verifyChain(c);const el=document.getElementById('v-'+r.id);if(el){el.textContent=ok?'Chain intact':'Chain broken';el.className='badge '+(ok?'ok':'bad')}}),0);
   return h;
