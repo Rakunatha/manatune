@@ -1,17 +1,31 @@
 """Manatune backend: accounts + saved creations, requests and reposts."""
-import os, re, json
+import os, re, json, time
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, redirect, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (LoginManager, UserMixin, login_user, logout_user,
                          login_required, current_user)
+from jinja2 import ChoiceLoader, FileSystemLoader
+from sqlalchemy.exc import OperationalError
 from werkzeug.security import generate_password_hash, check_password_hash
 
-app = Flask(__name__)
+def _db_url():
+    url = os.environ.get("DATABASE_URL", "sqlite:///manatune.db")
+    # Render gives postgres:// or postgresql://; pin the psycopg2 driver explicitly
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg2://" + url[len(prefix):]
+    return url
+
+
+BASE = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__, root_path=BASE)
+# look in templates/ first, then the project root, so a misplaced HTML file still loads
+app.jinja_loader = ChoiceLoader([FileSystemLoader(os.path.join(BASE, "templates")), FileSystemLoader(BASE)])
 app.config.update(
     SECRET_KEY=os.environ.get("SECRET_KEY", "dev-only-change-me"),
-    SQLALCHEMY_DATABASE_URI=os.environ.get(
-        "DATABASE_URL", "sqlite:///manatune.db").replace("postgres://", "postgresql://", 1),
+    SQLALCHEMY_DATABASE_URI=_db_url(),
+    SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True, "pool_recycle": 280},
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=bool(os.environ.get("RENDER")),  # HTTPS-only on Render
@@ -41,7 +55,19 @@ class Record(db.Model):
 
 
 with app.app_context():
-    db.create_all()
+    for attempt in range(6):  # the database can take a moment to accept connections on boot
+        try:
+            db.create_all()
+            break
+        except OperationalError:
+            if attempt == 5:
+                raise
+            time.sleep(3)
+
+
+@app.get("/healthz")
+def healthz():
+    return "ok"
 
 
 @lm.user_loader
