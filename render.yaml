@@ -19,6 +19,8 @@ services:
         fromDatabase:
           name: manatune-db
           property: connectionString
+      - key: PUBLIC_URL
+        sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
