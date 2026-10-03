@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Manatune</title>
+<style>
+:root{--bg:#f3f5f9;--card:#fff;--side:#fff;--text:#11151b;--mut:#5b6471;--bd:#d9dee7;--blue:#1f7ae8;--blue2:#1665c4;--sky:#0a78bd;--ok:#168246;--warn:#a56a0b;--bad:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1114;--card:#181b20;--side:#000;--text:#fff;--mut:#a7adb6;--bd:#262b33;--blue:#2d8cff;--blue2:#1a5fb4;--sky:#5cc8ff;--ok:#4cc282;--warn:#e0a63a;--bad:#ff7a6b}}
+:root[data-theme="dark"]{--bg:#0f1114;--card:#181b20;--side:#000;--text:#fff;--mut:#a7adb6;--bd:#262b33;--blue:#2d8cff;--blue2:#1a5fb4;--sky:#5cc8ff;--ok:#4cc282;--warn:#e0a63a;--bad:#ff7a6b}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.layout{display:grid;grid-template-columns:208px 1fr;min-height:100%}
+.side{background:var(--side);padding:20px 12px;border-right:1px solid var(--bd)}
+.logo{color:var(--blue);font-size:21px;font-weight:800;letter-spacing:-.02em;margin:0 8px 4px}
+.tag{color:var(--mut);font-size:12px;margin:0 8px 18px}
+.modes{display:flex;gap:4px;margin:0 0 18px;background:var(--bg);padding:3px;border-radius:8px}
+.modes button{flex:1;border:0;background:none;color:var(--mut);font-size:12px;font-weight:600;padding:7px 2px;border-radius:6px;cursor:pointer}
+.modes button.on{background:var(--blue);color:#fff}
+.nav{display:block;width:100%;text-align:left;border:0;background:none;color:var(--mut);font-size:14px;font-weight:600;padding:10px 8px;border-radius:6px;cursor:pointer;min-height:42px}
+.nav.on{background:var(--card);color:var(--text)}
+.main{padding:24px 30px 80px;min-width:0}
+h1{font-size:23px;margin:0 0 2px}
+.sub{color:var(--mut);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:14px;margin-bottom:14px}
+.tabs{display:flex;gap:4px;overflow-x:auto;padding:6px 6px 0;background:var(--side);border-radius:8px 8px 0 0;border:1px solid var(--bd);border-bottom:0}
+.tab{padding:8px 12px;border-radius:6px 6px 0 0;background:var(--bg);color:var(--mut);cursor:pointer;white-space:nowrap;font-size:12.5px}
+.tab.on{background:var(--card);color:var(--text)}
+.tab b{margin-left:8px;font-weight:400}
+.bar{display:flex;gap:8px;align-items:center;padding:10px;background:var(--card);border:1px solid var(--bd);border-bottom:0}
+.bar input{flex:1;min-width:0}
+.view{border:1px solid var(--bd);border-radius:0 0 8px 8px;background:var(--card);margin-bottom:14px;overflow:hidden}
+.note{padding:7px 12px;font-size:12px;color:var(--mut);border-bottom:1px solid var(--bd)}
+iframe{width:100%;height:340px;border:0;display:block;background:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:14px}
+.app{background:var(--bg);border-radius:8px;padding:12px;cursor:pointer;border:1px solid var(--bd)}
+.app:hover{border-color:var(--blue)}
+.app small{display:block;color:var(--sky);margin-top:2px}
+input,textarea,select{background:var(--bg);color:var(--text);border:1px solid var(--bd);border-radius:6px;padding:8px 10px;font:inherit;width:100%}
+textarea{min-height:60px;resize:vertical}
+input:focus,textarea:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:18px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--blue2)}
+.btn.ghost{background:none;color:var(--sky);border:1px solid var(--bd)}
+.btn.bad{background:var(--bad)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.badge{font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:10px;border:1px solid var(--bd);color:var(--mut)}
+.badge.ok{color:var(--ok);border-color:var(--ok)}.badge.warn{color:var(--warn);border-color:var(--warn)}.badge.bad{color:var(--bad);border-color:var(--bad)}
+.hash{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--mut);word-break:break-all}
+.cite{border-left:3px solid var(--blue);padding:6px 10px;margin-top:8px;background:var(--bg);border-radius:0 6px 6px 0;font-size:12.5px;color:var(--mut)}
+.cite b{color:var(--text)}
+.empty{color:var(--mut);padding:10px 0}
+a{color:var(--sky)}
+@media (max-width:700px){.layout{grid-template-columns:1fr}.side{border-right:0;border-bottom:1px solid var(--bd)}.main{padding:18px 14px 70px}.nav{display:inline-block;width:auto}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="side">
+    <div class="logo">Manatune</div>
+    <div class="tag">{{ me.name }}</div><form method="post" action="/logout" style="margin:0 8px 14px"><button class="btn ghost" style="padding:4px 12px;font-size:12px">Sign out</button></form>
+    <div class="modes" id="modes"></div>
+    <div id="nav"></div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const sha=async d=>{const b=typeof d==='string'?new TextEncoder().encode(d):d;const h=await crypto.subtle.digest('SHA-256',b);return[...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('')};
+const ME={{ me|tojson }};
+const TOOLS=[['ChatGPT','Conversational AI','https://chat.openai.com/'],['Claude','Conversational AI','https://claude.ai/'],['Midjourney','Image generation','https://www.midjourney.com/'],['GitHub Copilot','Code generation','https://github.com/features/copilot'],['ElevenLabs','Voice generation','https://elevenlabs.io/'],['Runway','Video generation','https://runwayml.com/']];
+let ADVOCATES=[];
+const NAV={taste:[['feed','Taste feed'],['browser','Browse & repost']],creator:[['browser','Browser'],['creations','My creations'],['requests','Legal requests']],advocate:[['inbox','Filing inbox']]};
+const MODES=[['taste','Taste'],['creator','Creator']].concat(ME.role==='advocate'?[['advocate','Advocate']]:[]);
+const S={mode:ME.role==='advocate'?'advocate':'creator',view:ME.role==='advocate'?'inbox':'browser',tabs:[],active:'home',creations:[],requests:[],reposts:[],msg:''};
+const ZERO='0'.repeat(64);
+const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(16)+Math.random().toString(16).slice(2);
+const safeUrl=u=>/^https?:\/\//i.test(u)?u:'#';
+async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.status===401){location='/login';return null}return r.json()}
+const save=(kind,o)=>api('/api/save',{kind:kind,id:o.id,data:o});
+async function load(){
+  const r=await fetch('/api/state');if(r.status===401){location='/login';return}
+  const d=await r.json();
+  S.requests=d.requests;ADVOCATES=d.advocates;
+  S.creations=d.creations.map(c=>{const q=d.requests.find(x=>x.cid===c.id);c.status=q?(q.status==='Declined'?'Not filed':q.status):'Not filed';return c});
+  S.reposts=d.reposts.map(x=>Object.assign({likes:0,liked:false},x));
+  render();
+}
+
+function setMode(m){S.mode=m;S.view=NAV[m][0][0];S.msg='';render()}
+function setView(v){S.view=v;S.msg='';render()}
+
+/* ---------- provenance chain ---------- */
+async function addEvent(c,type,extra){
+  const prev=c.events.length?c.events[c.events.length-1].hash:ZERO;
+  const ts=new Date().toISOString();
+  const hash=await sha(prev+type+ts+c.contentHash);
+  c.events.push({type,ts,prev,hash,extra:extra||''});
+}
+async function verifyChain(c){
+  let prev=ZERO;
+  for(const e of c.events){
+    if(e.prev!==prev||await sha(e.prev+e.type+e.ts+c.contentHash)!==e.hash)return false;
+    prev=e.hash;
+  }
+  return true;
+}
+
+/* ---------- browser ---------- */
+function platformOf(u){const h=u.hostname.replace(/^www\./,'');
+  if(/youtube\.com|youtu\.be/.test(h))return'YouTube';
+  if(/spotify\.com/.test(h))return'Spotify';
+  if(/instagram\.com/.test(h))return'Instagram';
+  if(/soundcloud\.com/.test(h))return'SoundCloud';
+  if(/vimeo\.com/.test(h))return'Vimeo';
+  return h}
+function canonical(raw){
+  let t=raw.trim();if(!t)return null;
+  if(!/^https?:\/\//i.test(t))t='https://'+t;
+  try{const u=new URL(t);const v=u.searchParams.get('v');u.search='';if(v&&/youtube/.test(u.hostname))u.searchParams.set('v',v);u.hash='';return u}catch(e){return null}
+}
+function openTab(url,title){
+  let t=S.tabs.find(x=>x.url===url);
+  if(!t){t={id:'t'+Date.now(),url,title};S.tabs.push(t)}
+  S.active=t.id;render()
+}
+function go(){
+  const u=canonical($('#addr').value);
+  if(!u){S.msg='Enter a valid web address.';return render()}
+  const known=TOOLS.find(x=>x[2]===u.href);
+  openTab(u.href,known?known[0]:platformOf(u));
+}
+function closeTab(id,e){e.stopPropagation();S.tabs=S.tabs.filter(t=>t.id!==id);if(S.active===id)S.active='home';render()}
+const curTab=()=>S.tabs.find(t=>t.id===S.active);
+
+async function logCreation(){
+  const t=curTab();
+  const title=$('#cTitle').value.trim();
+  if(!title){S.msg='Give the creation a title before logging it.';return render()}
+  const prompt=$('#cPrompt').value.trim(),human=$('#cHuman').value.trim();
+  const f=$('#cFile').files[0];
+  const contentHash=f?await sha(await f.arrayBuffer()):await sha(title+'\n'+prompt+'\n'+human);
+  const c={id:'c'+uid(),title,tool:t?t.title:'Unspecified',prompt,human,file:f?f.name:'',contentHash,events:[],status:'Not filed'};
+  await addEvent(c,'Created',t?'Session in '+t.title:'');
+  S.creations.unshift(c);save('creation',c);
+  S.msg='Logged "'+title+'". Fingerprint saved and chain started.';
+  S.view='creations';render();
+}
+async function repost(){
+  const t=curTab();if(!t)return;
+  const u=canonical(t.url);
+  const meta={source_url:u.href,platform:platformOf(u),title:t.title,reposted_by:ME.name,reposted_at:new Date().toISOString(),relationship:'Embed'};
+  const hash=await sha(JSON.stringify(meta));
+  S.reposts.unshift({id:'r'+uid(),meta,hash,likes:0,liked:false});save('repost',S.reposts[0]);
+  S.msg='Reposted with a provenance citation.';S.mode='taste';S.view='feed';render();
+}
+
+/* ---------- creator actions ---------- */
+async function logDist(id){
+  const c=S.creations.find(x=>x.id===id);
+  const where=prompt('Where was it shared or delivered? (platform, person or client)');
+  if(!where)return;
+  await addEvent(c,'Distributed',where);save('creation',c);render();
+}
+function sendReq(id){
+  const c=S.creations.find(x=>x.id===id);
+  const adv=($('#adv-'+id)||{}).value;if(!adv){S.msg='No advocates have joined yet.';return render()}
+  if(S.requests.find(r=>r.cid===id&&r.status!=='Declined')){S.msg='A request for this creation is already open.';return render()}
+  S.requests.unshift({id:'q'+uid(),cid:id,advocate:adv,status:'Requested'});
+  c.status='Requested';save('request',S.requests[0]);S.msg='Request sent to '+adv+'.';S.view='requests';render();
+}
+function setStatus(rid,st){
+  const r=S.requests.find(x=>x.id===rid);r.status=st;save('request',r);
+  const c=S.creations.find(x=>x.id===r.cid);
+  if(c)c.status=st==='Filed'?'Filed':st==='Declined'?'Not filed':st;
+  render();
+}
+function like(id){const r=S.reposts.find(x=>x.id===id);r.liked=!r.liked;r.likes+=r.liked?1:-1;render()}
+
+/* ---------- views ---------- */
+const stBadge=s=>'<span class="badge '+(s==='Filed'?'ok':s==='Declined'?'bad':s==='Not filed'?'':'warn')+'">'+esc(s)+'</span>';
+const chainHtml=c=>c.events.map(e=>'<div class="hash">'+esc(e.type)+(e.extra?' ('+esc(e.extra)+')':'')+' &middot; '+esc(e.ts.slice(0,19).replace('T',' '))+' UTC &middot; '+e.hash.slice(0,16)+'&hellip;</div>').join('');
+
+function vBrowser(){
+  const t=curTab();
+  let h='<h1>'+(S.mode==='taste'?'Browse & repost':'Browser')+'</h1><p class="sub">'+(S.mode==='taste'?'Open work from anywhere, then repost it with its source attached.':'Work in your AI tools here, then log what you made so it becomes provable.')+'</p>';
+  h+='<div class="tabs"><div class="tab '+(S.active==='home'?'on':'')+'" onclick="S.active=\'home\';render()">Tools</div>'+S.tabs.map(x=>'<div class="tab '+(x.id===S.active?'on':'')+'" onclick="S.active=\''+x.id+'\';render()">'+esc(x.title)+'<b onclick="closeTab(\''+x.id+'\',event)">&times;</b></div>').join('')+'</div>';
+  h+='<div class="bar"><input id="addr" placeholder="Paste a link or type an address" value="'+esc(t?t.url:'')+'" onkeydown="if(event.key===\'Enter\')go()"><button class="btn" onclick="go()">Go</button>'+(t?'<a href="'+esc(t.url)+'" target="_blank" rel="noopener">Open in new tab</a>':'')+'</div>';
+  h+='<div class="view">';
+  if(!t)h+='<div class="grid">'+TOOLS.map((x,i)=>'<div class="app" onclick="openTab(TOOLS['+i+'][2],TOOLS['+i+'][0])"><b>'+esc(x[0])+'</b><small>'+esc(x[1])+'</small></div>').join('')+'</div>';
+  else h+='<div class="note">If the page stays blank, the site blocks embedding. Use "Open in new tab".</div><iframe src="'+esc(t.url)+'" title="'+esc(t.title)+'"></iframe>';
+  h+='</div>';
+  if(S.msg)h+='<div class="card">'+esc(S.msg)+'</div>';
+  if(t){
+    h+='<div class="two">';
+    if(S.mode==='creator')h+='<div class="card"><b>Log a creation from this session</b><label>Title</label><input id="cTitle" placeholder="e.g. Monsoon poster, draft 3"><label>Prompt used</label><textarea id="cPrompt"></textarea><label>What you changed or added yourself</label><textarea id="cHuman" placeholder="Edits, composition, hand-drawn elements, rewriting&hellip;"></textarea><label>Output file (fingerprinted in your browser, never uploaded)</label><input id="cFile" type="file"><p><button class="btn" onclick="logCreation()">Log creation</button></p></div>';
+    h+='<div class="card"><b>Repost this page</b><p class="sub" style="margin:6px 0 12px">Adds it to your Taste profile with a citation to the original. Nothing is copied.</p><button class="btn" onclick="repost()">Repost with citation</button></div></div>';
+  }
+  return h;
+}
+function vCreations(){
+  let h='<h1>My creations</h1><p class="sub">Every record is fingerprinted and chained, so later edits to its history show up.</p>';
+  if(S.msg)h+='<div class="card">'+esc(S.msg)+'</div>';
+  if(!S.creations.length)return h+'<div class="empty">Nothing logged yet. Open a tool in the Browser and log what you make.</div>';
+  return h+S.creations.map(c=>'<div class="card"><div class="row"><b>'+esc(c.title)+'</b>'+stBadge(c.status)+'<span class="badge">'+esc(c.tool)+'</span></div><div class="hash">sha256:'+c.contentHash+'</div>'+(c.human?'<p><span class="sub">Your contribution:</span> '+esc(c.human)+'</p>':'<p class="sub">No human contribution noted. Add this before filing.</p>')+chainHtml(c)+'<div class="row" style="margin-top:10px"><button class="btn ghost" onclick="logDist(\''+c.id+'\')">Log distribution</button><select id="adv-'+c.id+'" style="width:auto">'+ADVOCATES.map(a=>'<option>'+esc(a)+'</option>').join('')+'</select><button class="btn" onclick="sendReq(\''+c.id+'\')">Request IP protection</button></div></div>').join('');
+}
+function vRequests(){
+  let h='<h1>Legal requests</h1><p class="sub">Status of the filings you asked advocates to handle.</p>';
+  if(S.msg)h+='<div class="card">'+esc(S.msg)+'</div>';
+  if(!S.requests.length)return h+'<div class="empty">No requests yet. Send one from My creations.</div>';
+  return h+S.requests.map(r=>{const c=S.creations.find(x=>x.id===r.cid);if(!c)return'';return'<div class="card"><div class="row"><b>'+esc(c.title)+'</b>'+stBadge(r.status)+'</div><div class="sub" style="margin:4px 0 0">With '+esc(r.advocate)+'</div></div>'}).join('');
+}
+function vInbox(){
+  let h='<h1>Filing inbox</h1><p class="sub">Requests from creators, each with its evidence pack.</p>';
+  if(!S.requests.length)return h+'<div class="empty">No requests yet. Switch to Creator, log a creation, and send one.</div>';
+  h+=S.requests.map(r=>{const c=S.creations.find(x=>x.id===r.cid);if(!c)return'';return'<div class="card"><div class="row"><b>'+esc(c.title)+'</b>'+stBadge(r.status)+'<span class="badge">'+esc(r.advocate)+'</span><span class="badge" id="v-'+r.id+'">Checking chain&hellip;</span></div><p><span class="sub">Tool:</span> '+esc(c.tool)+'<br><span class="sub">Prompt:</span> '+esc(c.prompt||'Not provided')+'<br><span class="sub">Human contribution:</span> '+esc(c.human||'Not provided')+'</p><div class="hash">sha256:'+c.contentHash+'</div>'+chainHtml(c)+'<div class="row" style="margin-top:10px"><button class="btn" onclick="setStatus(\''+r.id+'\',\'Accepted\')">Accept</button><button class="btn ghost" onclick="setStatus(\''+r.id+'\',\'Filed\')">Mark as filed</button><button class="btn bad" onclick="setStatus(\''+r.id+'\',\'Declined\')">Decline</button></div></div>'}).join('');
+  setTimeout(()=>S.requests.forEach(async r=>{const c=S.creations.find(x=>x.id===r.cid);if(!c)return;const ok=await verifyChain(c);const el=document.getElementById('v-'+r.id);if(el){el.textContent=ok?'Chain intact':'Chain broken';el.className='badge '+(ok?'ok':'bad')}}),0);
+  return h;
+}
+function vFeed(){
+  let h='<h1>Taste feed</h1><p class="sub">Work people have picked, with where it came from.</p>';
+  if(S.msg)h+='<div class="card">'+esc(S.msg)+'</div>';
+  const items=S.reposts.map(r=>'<div class="card"><div class="row"><b>'+esc(r.meta.title)+'</b><span class="badge">'+esc(r.meta.platform)+'</span></div><div class="cite"><b>Source:</b> '+esc(r.meta.platform)+' &middot; <a href="'+esc(safeUrl(r.meta.source_url))+'" target="_blank" rel="noopener">view original</a><br>Reposted by <b>'+esc(r.meta.reposted_by)+'</b> on '+esc(r.meta.reposted_at.slice(0,10))+' as an embed. Attributed to the source, not proof of ownership.<div class="hash">citation sha256:'+r.hash.slice(0,24)+'&hellip;</div></div><p><button class="btn ghost" onclick="like(\''+r.id+'\')">'+(r.liked?'Liked':'Like')+' &middot; '+r.likes+'</button></p></div>').join('');
+  const mine=S.creations.map(c=>'<div class="card"><div class="row"><b>'+esc(c.title)+'</b><span class="badge ok">Provenance recorded</span>'+(c.status==='Filed'?'<span class="badge ok">Filed for protection</span>':'')+'</div><div class="sub" style="margin:4px 0 0">Created with '+esc(c.tool)+' &middot; fingerprint '+c.contentHash.slice(0,12)+'&hellip;</div></div>').join('');
+  return h+((items||mine)?items+mine:'<div class="empty">Your feed is empty. Open a link in Browse & repost and share it.</div>');
+}
+
+function render(){
+  $('#modes').innerHTML=MODES.map(m=>'<button class="'+(S.mode===m[0]?'on':'')+'" onclick="setMode(\''+m[0]+'\')">'+m[1]+'</button>').join('');
+  $('#nav').innerHTML=NAV[S.mode].map(n=>'<button class="nav '+(S.view===n[0]?'on':'')+'" onclick="setView(\''+n[0]+'\')">'+n[1]+'</button>').join('');
+  const V={browser:vBrowser,creations:vCreations,requests:vRequests,inbox:vInbox,feed:vFeed};
+  $('#main').innerHTML=V[S.view]();
+  S.msg='';
+}
+render();load();
+</script>
+</body>
+</html>
