@@ -1,204 +1,169 @@
-"""
-Provenance Tracker — minimal backend
-Three things this serves:
-  1. GET  /api/apps     -> directory of AI apps/platforms to browse
-  2. GET  /api/events   -> log of created / downloaded / distributed items
-     POST /api/events   -> add a new event to that log
-  3. GET  /api/analyze  -> stats + an AI-written analysis of the event log
-                           (stats are always computed; the written analysis
-                           needs a Groq API key)
+"""Manatune backend: accounts + saved creations, requests and reposts."""
+import os, re, json
+from datetime import datetime
+from flask import Flask, request, jsonify, render_template, redirect, flash
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import (LoginManager, UserMixin, login_user, logout_user,
+                         login_required, current_user)
+from werkzeug.security import generate_password_hash, check_password_hash
 
-Run:
-  pip install -r requirements.txt
-  export GROQ_API_KEY=your_key_here   # optional, enables AI insights
-  python app.py
-Then open http://127.0.0.1:5000
-"""
+app = Flask(__name__)
+app.config.update(
+    SECRET_KEY=os.environ.get("SECRET_KEY", "dev-only-change-me"),
+    SQLALCHEMY_DATABASE_URI=os.environ.get(
+        "DATABASE_URL", "sqlite:///manatune.db").replace("postgres://", "postgresql://", 1),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=bool(os.environ.get("RENDER")),  # HTTPS-only on Render
+)
+db = SQLAlchemy(app)
+lm = LoginManager(app)
 
-from flask import Flask, jsonify, request, render_template
-import uuid
-import datetime
-import os
-import requests
-from collections import Counter
-
-app = Flask(__name__, template_folder=".")
-
-# ---- Groq (https://console.groq.com) config for the AI-written analysis ----
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
-
-# ---- Directory of AI apps & platforms (page 1: Browse) ----
-APPS = [
-    {"name": "ChatGPT",        "category": "Conversational AI", "blurb": "General-purpose AI chat assistant.",     "url": "https://chat.openai.com/"},
-    {"name": "Claude",         "category": "Conversational AI", "blurb": "AI assistant for writing and reasoning.", "url": "https://claude.ai/"},
-    {"name": "Midjourney",     "category": "Image Generation",  "blurb": "Text-to-image generation tool.",          "url": "https://www.midjourney.com/"},
-    {"name": "DALL\u00b7E",    "category": "Image Generation",  "blurb": "Image generation from text prompts.",     "url": "https://openai.com/dall-e-2"},
-    {"name": "GitHub Copilot", "category": "Code Generation",   "blurb": "AI pair programmer for code.",            "url": "https://github.com/features/copilot"},
-    {"name": "ElevenLabs",     "category": "Voice Generation",  "blurb": "AI voice and speech synthesis.",          "url": "https://elevenlabs.io/"},
-    {"name": "Runway",         "category": "Video Generation",  "blurb": "AI video generation and editing.",        "url": "https://runwayml.com/"},
-    {"name": "Notion AI",      "category": "Productivity",      "blurb": "AI writing assistant inside Notion.",     "url": "https://www.notion.so/product/ai"},
-]
-
-# ---- In-memory event log (page 2: Track) ----
-EVENTS = []  # each: {id, item, tool, user, action, timestamp}
+STATUSES = {"Requested", "Accepted", "Filed", "Declined"}
 
 
-@app.route("/")
+class User(UserMixin, db.Model):
+    __tablename__ = "users"
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+    name = db.Column(db.String(120), nullable=False)
+    role = db.Column(db.String(20), default="creator")  # creator | advocate
+    pw = db.Column(db.String(255), nullable=False)
+
+
+class Record(db.Model):
+    __tablename__ = "records"
+    id = db.Column(db.String(64), primary_key=True)
+    kind = db.Column(db.String(20), index=True)  # creation | request | repost
+    owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
+    data = db.Column(db.Text, nullable=False)
+    ts = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+with app.app_context():
+    db.create_all()
+
+
+@lm.user_loader
+def load_user(i):
+    return db.session.get(User, int(i))
+
+
+@lm.unauthorized_handler
+def unauthorized():
+    if request.path.startswith("/api/"):
+        return jsonify(error="login required"), 401
+    return redirect("/login")
+
+
+# ---------------- pages & auth ----------------
+@app.get("/")
+@login_required
 def index():
-    return render_template("index.html")
+    return render_template("index.html", me={"name": current_user.name, "role": current_user.role})
 
 
-@app.route("/api/apps")
-def get_apps():
-    return jsonify(APPS)
-
-
-@app.route("/api/events", methods=["GET", "POST"])
-def events():
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect("/")
     if request.method == "POST":
-        data = request.get_json(force=True) or {}
-        event = {
-            "id": str(uuid.uuid4())[:8],
-            "item": (data.get("item") or "Untitled item").strip(),
-            "tool": (data.get("tool") or "Unknown tool").strip(),
-            "user": (data.get("user") or "You").strip(),
-            "action": data.get("action") or "Created",
-            "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
-        }
-        EVENTS.insert(0, event)
-        return jsonify(event), 201
-
-    return jsonify(EVENTS)
+        email = request.form.get("email", "").strip().lower()
+        u = User.query.filter_by(email=email).first()
+        if u and check_password_hash(u.pw, request.form.get("password", "")):
+            login_user(u, remember=True)
+            return redirect("/")
+        flash("Wrong email or password.")
+    return render_template("login.html", tab="login")
 
 
-def _compute_stats():
-    """Pure number-crunching over EVENTS — no AI involved. This always
-    works, even with no GROQ_API_KEY set."""
-    total = len(EVENTS)
-    by_action = Counter(e["action"] for e in EVENTS)
-    by_tool = Counter(e["tool"] for e in EVENTS)
-    by_user = Counter(e["user"] for e in EVENTS)
-
-    return {
-        "total": total,
-        "by_action": dict(by_action),
-        "by_tool": by_tool.most_common(),
-        "by_user": by_user.most_common(),
-        "top_tool": by_tool.most_common(1)[0][0] if by_tool else None,
-        "top_user": by_user.most_common(1)[0][0] if by_user else None,
-        "created": by_action.get("Created", 0),
-        "downloaded": by_action.get("Downloaded", 0),
-        "distributed": by_action.get("Distributed", 0),
-        "visited": by_action.get("Visited", 0),
-    }
-
-
-def _build_prompt(stats):
-    lines = [
-        "You are a provenance analyst reviewing a log of AI-generated content "
-        "activity: what was created, downloaded, and distributed, with which "
-        "tool, by which user.",
-        "",
-        f"Total events: {stats['total']}",
-        f"Created: {stats['created']}  Downloaded: {stats['downloaded']}  "
-        f"Distributed: {stats['distributed']}  Visited/opened: {stats['visited']}",
-        "",
-        "Event counts by tool: " + ", ".join(f"{t}={c}" for t, c in stats["by_tool"]) or "(none)",
-        "Event counts by user: " + ", ".join(f"{u}={c}" for u, c in stats["by_user"]) or "(none)",
-        "",
-        "Recent raw events (newest first, up to 40):",
-    ]
-    for e in EVENTS[:40]:
-        lines.append(
-            f"- [{e['timestamp']}] {e['user']} {e['action'].lower()} "
-            f"'{e['item']}' using {e['tool']}"
-        )
-
-    lines += [
-        "",
-        "Write a concise but in-depth analysis (use short headers and bullet "
-        "points) covering:",
-        "1. Overall activity pattern — what's being created vs. downloaded vs. distributed.",
-        "2. Which tools dominate, and for which kind of action.",
-        "3. Who is most active, and any concentration worth flagging.",
-        "4. Provenance/traceability observations — e.g. items that were "
-        "distributed without a matching 'created' entry, or tools used only "
-        "for distribution rather than creation.",
-        "5. Two or three concrete recommendations for better tracking or "
-        "governance going forward.",
-        "Be specific and reference the actual numbers/tools/users above. "
-        "Do not invent data that isn't in the log.",
-    ]
-    return "\n".join(lines)
+@app.post("/signup")
+def signup():
+    f = request.form
+    email, name = f.get("email", "").strip().lower(), f.get("name", "").strip()
+    pw = f.get("password", "")
+    role = "advocate" if f.get("role") == "advocate" else "creator"
+    err = None
+    if not name or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        err = "Enter your name and a valid email."
+    elif len(pw) < 8:
+        err = "Use a password of at least 8 characters."
+    elif User.query.filter_by(email=email).first():
+        err = "That email already has an account. Sign in instead."
+    elif role == "advocate" and User.query.filter_by(role="advocate", name=name).first():
+        err = "An advocate or firm with that name already exists."
+    if err:
+        flash(err)
+        return render_template("login.html", tab="signup"), 400
+    u = User(email=email, name=name, role=role, pw=generate_password_hash(pw))
+    db.session.add(u)
+    db.session.commit()
+    login_user(u, remember=True)
+    return redirect("/")
 
 
-@app.route("/api/analyze")
-def analyze():
-    stats = _compute_stats()
+@app.post("/logout")
+def logout():
+    logout_user()
+    return redirect("/login")
 
-    # Stats are free and always computed. The AI-written analysis calls
-    # Groq, so it only runs when explicitly requested (?ai=1) — e.g. when
-    # the user clicks "Generate insights" — not on every page load.
-    want_ai = request.args.get("ai") == "1"
 
-    if stats["total"] == 0:
-        return jsonify({
-            "stats": stats,
-            "insights": None,
-            "note": "No events logged yet — log some activity on the Track "
-                    "page first.",
-        })
+# ---------------- data API ----------------
+def _out(r):
+    d = json.loads(r.data)
+    d["id"] = r.id
+    return d
 
-    if not want_ai:
-        return jsonify({"stats": stats, "insights": None, "note": None})
 
-    if not GROQ_API_KEY:
-        return jsonify({
-            "stats": stats,
-            "insights": None,
-            "note": "Set the GROQ_API_KEY environment variable to enable "
-                    "AI-written insights (get a key at console.groq.com). "
-                    "Stats below are computed either way.",
-        })
+@app.get("/api/state")
+@login_required
+def state():
+    uid = current_user.id
+    advocates = [u.name for u in User.query.filter_by(role="advocate").order_by(User.name)]
+    if current_user.role == "advocate":
+        reqs = [r for r in Record.query.filter_by(kind="request")
+                if json.loads(r.data).get("advocate") == current_user.name]
+        cids = {json.loads(r.data).get("cid") for r in reqs}
+        creations = Record.query.filter(Record.kind == "creation", Record.id.in_(cids)).all() if cids else []
+    else:
+        reqs = Record.query.filter_by(kind="request", owner_id=uid).all()
+        creations = Record.query.filter_by(kind="creation", owner_id=uid).order_by(Record.ts.desc()).all()
+    reposts = Record.query.filter_by(kind="repost").order_by(Record.ts.desc()).limit(100).all()
+    return jsonify(creations=[_out(r) for r in creations], requests=[_out(r) for r in reqs],
+                   reposts=[_out(r) for r in reposts], advocates=advocates)
 
-    try:
-        resp = requests.post(
-            GROQ_API_URL,
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": GROQ_MODEL,
-                "messages": [
-                    {"role": "user", "content": _build_prompt(stats)},
-                ],
-                "temperature": 0.4,
-                "max_tokens": 900,
-            },
-            timeout=30,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        insights = data["choices"][0]["message"]["content"]
-        return jsonify({"stats": stats, "insights": insights, "note": None})
 
-    except requests.exceptions.RequestException as e:
-        return jsonify({
-            "stats": stats,
-            "insights": None,
-            "note": f"Groq API request failed: {e}",
-        }), 502
-    except (KeyError, IndexError):
-        return jsonify({
-            "stats": stats,
-            "insights": None,
-            "note": "Groq API returned an unexpected response format.",
-        }), 502
+@app.post("/api/save")
+@login_required
+def save():
+    p = request.get_json(silent=True) or {}
+    kind, rid, data = p.get("kind"), str(p.get("id", "")), p.get("data")
+    if (kind not in ("creation", "request", "repost") or not re.match(r"^[a-z0-9-]{1,64}$", rid)
+            or not isinstance(data, dict) or len(json.dumps(data)) > 100_000):
+        return jsonify(error="bad request"), 400
+    if kind == "repost":  # reposts are public, so validate the link and set the poster server-side
+        m = data.get("meta")
+        if not isinstance(m, dict) or not str(m.get("source_url", "")).startswith(("http://", "https://")):
+            return jsonify(error="bad request"), 400
+        m["reposted_by"] = current_user.name
+    r = db.session.get(Record, rid)
+    if r is None:
+        db.session.add(Record(id=rid, kind=kind, owner_id=current_user.id, data=json.dumps(data)))
+    elif r.kind != kind:
+        return jsonify(error="bad request"), 400
+    elif r.owner_id == current_user.id:
+        r.data = json.dumps(data)
+    elif kind == "request" and current_user.role == "advocate":
+        old = json.loads(r.data)  # advocates may change status only, on requests sent to them
+        if old.get("advocate") != current_user.name or data.get("status") not in STATUSES:
+            return jsonify(error="forbidden"), 403
+        old["status"] = data["status"]
+        r.data = json.dumps(old)
+    else:
+        return jsonify(error="forbidden"), 403
+    db.session.commit()
+    return jsonify(ok=True)
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
