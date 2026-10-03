@@ -75,9 +75,9 @@ const sha=async d=>{const b=typeof d==='string'?new TextEncoder().encode(d):d;co
 const ME={{ me|tojson }};
 const TOOLS=[['ChatGPT','Conversational AI','https://chat.openai.com/'],['Claude','Conversational AI','https://claude.ai/'],['Midjourney','Image generation','https://www.midjourney.com/'],['GitHub Copilot','Code generation','https://github.com/features/copilot'],['ElevenLabs','Voice generation','https://elevenlabs.io/'],['Runway','Video generation','https://runwayml.com/']];
 let ADVOCATES=[];
-const NAV={taste:[['feed','Taste feed'],['browser','Browse & repost']],creator:[['browser','Browser'],['creations','My creations'],['requests','Legal requests']],advocate:[['inbox','Filing inbox']]};
+const NAV={taste:[['feed','Taste feed'],['browser','Browse & repost']],creator:[['studio','Reaction studio'],['browser','Browser'],['creations','My creations'],['requests','Legal requests']],advocate:[['inbox','Filing inbox']]};
 const MODES=[['taste','Taste'],['creator','Creator']].concat(ME.role==='advocate'?[['advocate','Advocate']]:[]);
-const S={mode:ME.role==='advocate'?'advocate':'creator',view:ME.role==='advocate'?'inbox':'browser',tabs:[],active:'home',creations:[],requests:[],reposts:[],msg:''};
+const S={mode:ME.role==='advocate'?'advocate':'creator',view:ME.role==='advocate'?'inbox':'studio',tabs:[],active:'home',creations:[],requests:[],reposts:[],msg:''};
 const ZERO='0'.repeat(64);
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(16)+Math.random().toString(16).slice(2);
 const safeUrl=u=>/^https?:\/\//i.test(u)?u:'#';
@@ -225,16 +225,96 @@ function vInbox(){
 function vFeed(){
   let h='<h1>Taste feed</h1><p class="sub">Work people have picked, with where it came from.</p>';
   if(S.msg)h+='<div class="card">'+esc(S.msg)+'</div>';
-  const items=S.reposts.map(r=>'<div class="card"><div class="row"><b>'+esc(r.meta.title)+'</b><span class="badge">'+esc(r.meta.platform)+'</span></div><div class="cite"><b>Source:</b> '+esc(r.meta.platform)+' &middot; <a href="'+esc(safeUrl(r.meta.source_url))+'" target="_blank" rel="noopener">view original</a><br>Reposted by <b>'+esc(r.meta.reposted_by)+'</b> on '+esc(r.meta.reposted_at.slice(0,10))+' as an embed. Attributed to the source, not proof of ownership.<div class="hash">citation sha256:'+r.hash.slice(0,24)+'&hellip;</div></div><p><button class="btn ghost" onclick="like(\''+r.id+'\')">'+(r.liked?'Liked':'Like')+' &middot; '+r.likes+'</button></p></div>').join('');
+  const items=S.reposts.map(r=>r.reaction_url?reactCard(r):'<div class="card"><div class="row"><b>'+esc(r.meta.title)+'</b><span class="badge">'+esc(r.meta.platform)+'</span></div><div class="cite"><b>Source:</b> '+esc(r.meta.platform)+' &middot; <a href="'+esc(safeUrl(r.meta.source_url))+'" target="_blank" rel="noopener">view original</a><br>Reposted by <b>'+esc(r.meta.reposted_by)+'</b> on '+esc(r.meta.reposted_at.slice(0,10))+' as an embed. Attributed to the source, not proof of ownership.<div class="hash">citation sha256:'+r.hash.slice(0,24)+'&hellip;</div></div><p><button class="btn ghost" onclick="like(\''+r.id+'\')">'+(r.liked?'Liked':'Like')+' &middot; '+r.likes+'</button></p></div>').join('');
   const mine=S.creations.map(c=>'<div class="card"><div class="row"><b>'+esc(c.title)+'</b><span class="badge ok">Provenance recorded</span>'+(c.status==='Filed'?'<span class="badge ok">Filed for protection</span>':'')+'</div><div class="sub" style="margin:4px 0 0">Created with '+esc(c.tool)+' &middot; fingerprint '+c.contentHash.slice(0,12)+'&hellip;</div></div>').join('');
   return h+((items||mine)?items+mine:'<div class="empty">Your feed is empty. Open a link in Browse & repost and share it.</div>');
 }
 
+/* ---------- reaction studio ---------- */
+const ST={src:'',markers:[],stream:null,rec:null,chunks:[],t0:0,recording:false,blobUrl:'',hash:'',ext:'webm',saved:null};
+function embedUrl(raw){
+  try{const u=new URL(raw),h=u.hostname.replace(/^www\./,'');
+    if(h==='youtu.be')return'https://www.youtube.com/embed/'+u.pathname.slice(1);
+    if(h==='youtube.com'||h==='m.youtube.com'){const v=u.searchParams.get('v');if(v)return'https://www.youtube.com/embed/'+v;const m=u.pathname.match(/^\/(shorts|embed)\/([\w-]+)/);if(m)return'https://www.youtube.com/embed/'+m[2]}
+    if(h==='open.spotify.com')return'https://open.spotify.com/embed'+u.pathname;
+    if(h==='vimeo.com'&&/^\/\d+/.test(u.pathname))return'https://player.vimeo.com/video'+u.pathname;
+    if(h==='soundcloud.com')return'https://w.soundcloud.com/player/?url='+encodeURIComponent(u.href);
+  }catch(e){}
+  return null}
+const frame=(e,t)=>'<iframe src="'+esc(e)+'" title="'+esc(t)+'" allow="autoplay; encrypted-media; fullscreen" allowfullscreen style="height:300px"></iframe>';
+const noEmbed=u=>'<div class="note">This site does not allow embedding. <a href="'+esc(safeUrl(u))+'" target="_blank" rel="noopener">Open it in another tab</a>.</div>';
+function srcEmbed(u){if(!u)return'<div class="empty">Paste a link above to load the content.</div>';const e=embedUrl(u);return e?frame(e,'Original content'):noEmbed(u)}
+function stInfo(){
+  if(ST.recording)return'Recording. '+ST.markers.length+' moment(s) marked.';
+  if(ST.blobUrl)return'<a class="btn ghost" download="reaction.'+ST.ext+'" href="'+ST.blobUrl+'">Download recording</a><div class="hash">sha256:'+ST.hash+'</div>'+(ST.saved?'<span class="badge ok">Record saved</span>':'<label>Title</label><input id="stTitle" placeholder="e.g. Reacting to the new trailer"><p><button class="btn" onclick="stSave()">Save record</button></p>');
+  return ST.stream?'Camera ready. Press Record, then play the original.':'Start your camera to begin.'}
+function stPost(){
+  if(!ST.saved)return'<div class="empty">Save your record to unlock publishing.</div>';
+  return'<p class="sub" style="margin:0 0 8px">Upload the downloaded file, then paste the link to your posted video.</p><div class="row"><button class="btn ghost" onclick="stOpen(\'https://www.youtube.com/upload\',\'YouTube\')">Upload on YouTube</button><button class="btn ghost" onclick="stOpen(\'https://vimeo.com/upload\',\'Vimeo\')">Upload on Vimeo</button></div><label>Link to your posted reaction</label><div class="row"><input id="stLink" placeholder="https://youtu.be/..."><button class="btn" onclick="stShare()">Share as reaction</button></div><p class="sub" style="margin:12px 0 0">To protect it, use Request IP protection in My creations.</p>'}
+function vStudio(){
+  return'<h1>Reaction studio</h1><p class="sub">Only your camera and microphone are recorded. The original plays from its own source, so nothing is copied.</p>'+(S.msg?'<div class="card">'+esc(S.msg)+'</div>':'')
+  +'<div class="card"><label>Content you are reacting to</label><div class="row"><input id="stSrc" value="'+esc(ST.src)+'" placeholder="Paste a YouTube, Spotify, SoundCloud or Vimeo link" onkeydown="if(event.key===\'Enter\')stLoad()"><button class="btn" onclick="stLoad()">Load</button></div></div>'
+  +'<div class="two"><div class="card"><b>Original</b><div id="stEmbed" style="margin-top:8px">'+srcEmbed(ST.src)+'</div></div>'
+  +'<div class="card"><b>You</b><video id="stCam" playsinline style="width:100%;margin-top:8px;border-radius:6px;background:#000;max-height:300px"></video><div class="row" style="margin:8px 0"><button class="btn ghost" onclick="stCamOn()">Start camera</button><button class="btn" onclick="stRec()">Record</button><button class="btn bad" onclick="stStop()">Stop</button><button class="btn ghost" onclick="stMark()">Mark moment</button></div><div id="stInfo">'+stInfo()+'</div></div></div>'
+  +'<div class="card"><b>Publish</b><div id="stPost" style="margin-top:8px">'+stPost()+'</div></div>'}
+function stAttach(){const v=$('#stCam');if(!v)return;if(ST.blobUrl){v.src=ST.blobUrl;v.controls=true}else if(ST.stream){v.srcObject=ST.stream;v.muted=true;v.play()}}
+function stLoad(){const u=canonical($('#stSrc').value);if(!u){S.msg='Enter a valid link.';return render()}ST.src=u.href;$('#stEmbed').innerHTML=srcEmbed(ST.src)}
+async function stCamOn(){try{ST.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});stAttach();$('#stInfo').innerHTML=stInfo()}catch(e){$('#stInfo').textContent='Camera or microphone access was blocked. Allow it in your browser settings and try again.'}}
+function stRec(){
+  if(!ST.stream){$('#stInfo').textContent='Start your camera first.';return}
+  if(!ST.src){$('#stInfo').textContent='Load the content you are reacting to first.';return}
+  if(ST.blobUrl){URL.revokeObjectURL(ST.blobUrl);ST.blobUrl='';ST.saved=null;const v=$('#stCam');v.removeAttribute('src');v.controls=false;stAttach();$('#stPost').innerHTML=stPost()}
+  ST.chunks=[];ST.markers=[];ST.rec=new MediaRecorder(ST.stream);
+  ST.rec.ondataavailable=e=>{if(e.data.size)ST.chunks.push(e.data)};ST.rec.onstop=stDone;
+  ST.rec.start();ST.t0=performance.now();ST.recording=true;$('#stInfo').innerHTML=stInfo()}
+function stMark(){if(!ST.recording)return;ST.markers.push(+((performance.now()-ST.t0)/1000).toFixed(1));$('#stInfo').innerHTML=stInfo()}
+function stStop(){if(ST.recording){ST.recording=false;ST.rec.stop()}}
+async function stDone(){
+  const b=new Blob(ST.chunks,{type:ST.rec.mimeType||'video/webm'});
+  ST.ext=b.type.includes('mp4')?'mp4':'webm';ST.hash=await sha(await b.arrayBuffer());ST.blobUrl=URL.createObjectURL(b);
+  const v=$('#stCam');if(v){v.srcObject=null;v.src=ST.blobUrl;v.controls=true;v.muted=false}
+  const i=$('#stInfo');if(i)i.innerHTML=stInfo()}
+async function stSave(){
+  const t=($('#stTitle')||{}).value;
+  if(!t||!t.trim()){$('#stInfo').insertAdjacentHTML('beforeend','<span class="badge bad">Add a title first.</span>');return}
+  const c={id:'c'+uid(),title:t.trim(),tool:'Manatune Studio',prompt:'',human:'Live reaction recorded on camera and microphone, in response to '+ST.src,contentHash:ST.hash,file:'reaction.'+ST.ext,source:{url:ST.src,platform:platformOf(new URL(ST.src))},markers:ST.markers.slice(),events:[],status:'Not filed'};
+  await addEvent(c,'Created','Reaction recorded');
+  S.creations.unshift(c);save('creation',c);ST.saved=c.id;
+  $('#stInfo').innerHTML=stInfo();$('#stPost').innerHTML=stPost()}
+function stOpen(u,t){S.view='browser';openTab(u,t)}
+async function stShare(){
+  const u=canonical(($('#stLink')||{}).value||'');
+  if(!u){$('#stPost').insertAdjacentHTML('beforeend','<span class="badge bad">Paste the link to your posted video.</span>');return}
+  const c=S.creations.find(x=>x.id===ST.saved);if(!c)return;
+  const meta={source_url:ST.src,platform:c.source.platform,title:c.title,reposted_by:ME.name,reposted_at:new Date().toISOString(),relationship:'Reaction'};
+  const p={id:'r'+uid(),cid:c.id,reaction_url:u.href,meta,hash:await sha(JSON.stringify(meta)+u.href+c.contentHash),prov:{contentHash:c.contentHash,events:c.events,markers:c.markers,tool:c.tool},likes:0,liked:false};
+  S.reposts.unshift(p);save('repost',p);S.watch=p.id;S.mode='taste';S.view='watch';render()}
+
+/* ---------- watch page ---------- */
+const embedBox=(u,label)=>{const e=embedUrl(u);return'<div class="card"><b>'+esc(label)+'</b><div style="margin-top:8px">'+(e?frame(e,label):noEmbed(u))+'</div></div>'};
+function toggleCite(){const e=$('#cite');e.hidden=!e.hidden;$('#citeBtn').textContent=e.hidden?'Show citation':'Hide citation'}
+function vWatch(){
+  const p=S.reposts.find(x=>x.id===S.watch);
+  if(!p)return'<div class="empty">That post is no longer available.</div><p><button class="btn ghost" onclick="setView(\'feed\')">Back to feed</button></p>';
+  const pv=p.prov||{events:[]};
+  return'<div class="row" style="margin-bottom:12px"><button class="btn ghost" onclick="setView(\'feed\')">Back</button><h1 style="margin:0;flex:1">'+esc(p.meta.title)+'</h1><button class="btn" id="citeBtn" onclick="toggleCite()">Show citation</button></div>'
+  +'<div id="cite" class="card" hidden><b>Citation and provenance</b>'
+  +'<div class="cite"><b>Original:</b> '+esc(p.meta.platform)+' &middot; <a href="'+esc(safeUrl(p.meta.source_url))+'" target="_blank" rel="noopener">view original</a><br>Attributed to the source. This is not proof of ownership.</div>'
+  +(p.reaction_url?'<div class="cite"><b>Reaction by '+esc(p.meta.reposted_by)+'</b><br>Recorded with '+esc(pv.tool||'unknown tool')+' &middot; '+((pv.markers||[]).length)+' marked moments<br>Registered on platform: '+esc(p.server_ts||'pending')+'<div class="hash">sha256:'+esc(pv.contentHash||'')+'</div>History: <span id="chain" class="badge">Checking&hellip;</span>'+chainHtml(pv)+'</div>':'')
+  +'<div class="cite"><b>Copyright protection:</b> '+stBadge(p.protection||'Not requested')+'</div></div>'
+  +'<div class="two">'+(p.reaction_url?embedBox(p.reaction_url,'Reaction by '+p.meta.reposted_by):'')+embedBox(p.meta.source_url,'Original on '+p.meta.platform)+'</div>'}
+function watchVerify(){
+  const p=S.reposts.find(x=>x.id===S.watch);
+  if(p&&p.reaction_url&&p.prov)verifyChain({contentHash:p.prov.contentHash,events:p.prov.events}).then(ok=>{const e=$('#chain');if(e){e.textContent=ok?'Chain intact':'Chain broken';e.className='badge '+(ok?'ok':'bad')}})}
+const reactCard=r=>'<div class="card"><div class="row"><b>'+esc(r.meta.title)+'</b><span class="badge ok">Reaction</span><span class="badge">'+esc(r.meta.platform)+'</span>'+(r.protection&&r.protection!=='Not requested'?stBadge(r.protection):'')+'</div><div class="sub" style="margin:4px 0 10px">by '+esc(r.meta.reposted_by)+' &middot; reacting to content on '+esc(r.meta.platform)+'</div><button class="btn" onclick="S.watch=\''+r.id+'\';S.view=\'watch\';render()">Watch with citation</button></div>';
+
 function render(){
   $('#modes').innerHTML=MODES.map(m=>'<button class="'+(S.mode===m[0]?'on':'')+'" onclick="setMode(\''+m[0]+'\')">'+m[1]+'</button>').join('');
   $('#nav').innerHTML=NAV[S.mode].map(n=>'<button class="nav '+(S.view===n[0]?'on':'')+'" onclick="setView(\''+n[0]+'\')">'+n[1]+'</button>').join('');
-  const V={browser:vBrowser,creations:vCreations,requests:vRequests,inbox:vInbox,feed:vFeed};
+  const V={studio:vStudio,watch:vWatch,browser:vBrowser,creations:vCreations,requests:vRequests,inbox:vInbox,feed:vFeed};
   $('#main').innerHTML=V[S.view]();
+  if(S.view==='studio')stAttach();
+  if(S.view==='watch')watchVerify();
   S.msg='';
 }
 render();load();
