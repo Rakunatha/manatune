@@ -28,24 +28,14 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outl
   <div class="logo">Manatune</div>
   <div class="card">
     {% for m in get_flashed_messages() %}<p class="err">{{ m }}</p>{% endfor %}
-    {% if mode == 'welcome' %}
-    <form method="post" action="/welcome" style="display:block">
-      <p style="margin:0 0 4px"><b>Welcome, {{ me.name }}.</b></p>
-      <p class="hint" style="margin:0">One quick choice. You can't change this later.</p>
-      <label for="sr">I am joining as</label>
-      <select id="sr" name="role" onchange="document.getElementById('nm').style.display=this.value==='advocate'?'block':'none'">
-        <option value="creator">A Creator or A Content lover</option>
-        <option value="advocate">An IP advocate or firm</option>
-      </select>
-      <div id="nm" style="display:none">
-        <label for="sn">Advocate or firm name</label>
-        <input id="sn" name="name" value="{{ me.name }}">
-      </div>
-      <button class="go">Continue</button>
-    </form>
+    {% if mode == 'advocate' %}
+    <p style="margin:0 0 12px"><b>IP advocate sign-in</b></p>
+    <p class="hint" style="margin:0 0 14px">For lawyers and firms who receive filing requests from creators.</p>
+    <a class="g" href="/auth/google/advocate">Continue with Google</a>
+    <p class="hint" style="text-align:center;margin-top:12px"><a href="/login" style="color:var(--mut)">Not an advocate? Creator sign-in</a></p>
     {% else %}
     <a class="g" href="/auth/google">Continue with Google</a>
-    <p class="hint" style="text-align:center;margin-top:12px">Google is the only way to sign in.</p>
+    <p class="hint" style="text-align:center;margin-top:12px"><a href="/ipadvo" style="color:var(--mut)">IP advocate or firm? Sign in here</a></p>
     {% endif %}
   </div>
 </div>
