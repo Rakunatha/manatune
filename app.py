@@ -1,7 +1,7 @@
 """Manatune backend: accounts + saved creations, requests and reposts."""
-import os, re, json, time, secrets
+import os, re, json, time
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template, redirect, flash, url_for
+from flask import Flask, request, jsonify, render_template, redirect, flash, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (LoginManager, UserMixin, login_user, logout_user,
                          login_required, current_user)
@@ -9,7 +9,6 @@ from jinja2 import ChoiceLoader, FileSystemLoader
 from sqlalchemy.exc import OperationalError
 from authlib.integrations.flask_client import OAuth
 from werkzeug.middleware.proxy_fix import ProxyFix
-from werkzeug.security import generate_password_hash, check_password_hash
 
 def _db_url():
     url = os.environ.get("DATABASE_URL", "sqlite:///manatune.db")
@@ -92,43 +91,11 @@ def index():
     return render_template("index.html", me={"name": current_user.name, "role": current_user.role})
 
 
-@app.route("/login", methods=["GET", "POST"])
+@app.get("/login")
 def login():
     if current_user.is_authenticated:
         return redirect("/")
-    if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
-        u = User.query.filter_by(email=email).first()
-        if u and check_password_hash(u.pw, request.form.get("password", "")):
-            login_user(u, remember=True)
-            return redirect("/")
-        flash("Wrong email or password.")
-    return render_template("login.html", tab="login")
-
-
-@app.post("/signup")
-def signup():
-    f = request.form
-    email, name = f.get("email", "").strip().lower(), f.get("name", "").strip()
-    pw = f.get("password", "")
-    role = "advocate" if f.get("role") == "advocate" else "creator"
-    err = None
-    if not name or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
-        err = "Enter your name and a valid email."
-    elif len(pw) < 8:
-        err = "Use a password of at least 8 characters."
-    elif User.query.filter_by(email=email).first():
-        err = "That email already has an account. Sign in instead."
-    elif role == "advocate" and User.query.filter_by(role="advocate", name=name).first():
-        err = "An advocate or firm with that name already exists."
-    if err:
-        flash(err)
-        return render_template("login.html", tab="signup"), 400
-    u = User(email=email, name=name, role=role, pw=generate_password_hash(pw))
-    db.session.add(u)
-    db.session.commit()
-    login_user(u, remember=True)
-    return redirect("/")
+    return render_template("login.html", mode="signin")
 
 
 @app.post("/logout")
@@ -137,7 +104,7 @@ def logout():
     return redirect("/login")
 
 
-# ---------------- Google sign-in ----------------
+# ---------------- Google sign-in (the only way in) ----------------
 GOOGLE_ENABLED = bool(os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET"))
 oauth = OAuth(app)
 if GOOGLE_ENABLED:
@@ -150,41 +117,75 @@ if GOOGLE_ENABLED:
     )
 
 
-@app.context_processor
-def _inject():
-    return {"google_enabled": GOOGLE_ENABLED}
+def _callback_url():
+    # Must match the "Authorized redirect URI" in Google Cloud exactly.
+    # PUBLIC_URL (e.g. https://manatune.onrender.com) wins; otherwise build it, forcing https on Render.
+    base = os.environ.get("PUBLIC_URL", "").rstrip("/")
+    if base:
+        return base + "/auth/google/callback"
+    return url_for("google_callback", _external=True, _scheme="https" if os.environ.get("RENDER") else None)
 
 
 @app.get("/auth/google")
 def google_login():
     if not GOOGLE_ENABLED:
-        flash("Google sign-in isn't set up yet.")
+        flash("Google sign-in isn't configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.")
         return redirect("/login")
-    return oauth.google.authorize_redirect(url_for("google_callback", _external=True))
+    try:
+        return oauth.google.authorize_redirect(_callback_url(), prompt="select_account")
+    except Exception:
+        app.logger.exception("Google authorize_redirect failed")
+        flash("Could not reach Google. Please try again.")
+        return redirect("/login")
 
 
 @app.get("/auth/google/callback")
 def google_callback():
     if not GOOGLE_ENABLED:
         return redirect("/login")
+    if request.args.get("error"):  # user cancelled or Google refused
+        flash("Google sign-in was cancelled.")
+        return redirect("/login")
     try:
-        info = oauth.google.authorize_access_token().get("userinfo") or {}
+        token = oauth.google.authorize_access_token()
+        info = token.get("userinfo") or oauth.google.userinfo(token=token) or {}
     except Exception:
+        app.logger.exception("Google token exchange failed")
         flash("Google sign-in failed. Please try again.")
         return redirect("/login")
     email = (info.get("email") or "").strip().lower()
-    if not email or not info.get("email_verified"):
+    if not email or info.get("email_verified") not in (True, "true"):
         flash("Google did not confirm that email address.")
         return redirect("/login")
     u = User.query.filter_by(email=email).first()
-    if u is None:  # new Google users join as creators; advocates sign up with email
+    if u is None:
         name = (info.get("name") or email.split("@")[0])[:120]
-        u = User(email=email, name=name, role="creator",
-                 pw=generate_password_hash(secrets.token_urlsafe(32)))
+        # pw is an unused legacy column (NOT NULL in existing databases); store an unusable value
+        u = User(email=email, name=name, role="creator", pw="!google-only")
         db.session.add(u)
         db.session.commit()
+        session["onboard"] = True  # first sign-in: let them pick creator or advocate once
     login_user(u, remember=True)
-    return redirect("/")
+    return redirect("/welcome" if session.get("onboard") else "/")
+
+
+@app.route("/welcome", methods=["GET", "POST"])
+@login_required
+def welcome():
+    if not session.get("onboard"):
+        return redirect("/")
+    if request.method == "POST":
+        role = "advocate" if request.form.get("role") == "advocate" else "creator"
+        name = request.form.get("name", "").strip()[:120] or current_user.name
+        if role == "advocate" and User.query.filter(User.role == "advocate", User.name == name,
+                                                    User.id != current_user.id).first():
+            flash("An advocate or firm with that name already exists.")
+            return render_template("login.html", mode="welcome", me=current_user), 400
+        current_user.role, current_user.name = role, name
+        db.session.commit()
+        session.pop("onboard", None)
+        return redirect("/")
+    return render_template("login.html", mode="welcome", me=current_user)
 
 
 # ---------------- data API ----------------
