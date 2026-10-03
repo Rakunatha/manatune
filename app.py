@@ -98,10 +98,18 @@ def login():
     return render_template("login.html", mode="signin")
 
 
+@app.get("/ipadvo")
+def ipadvo():
+    if current_user.is_authenticated:
+        return redirect("/")
+    return render_template("login.html", mode="advocate")
+
+
 @app.post("/logout")
 def logout():
+    back = "/ipadvo" if current_user.is_authenticated and current_user.role == "advocate" else "/login"
     logout_user()
-    return redirect("/login")
+    return redirect(back)
 
 
 # ---------------- Google sign-in (the only way in) ----------------
@@ -126,66 +134,64 @@ def _callback_url():
     return url_for("google_callback", _external=True, _scheme="https" if os.environ.get("RENDER") else None)
 
 
-@app.get("/auth/google")
-def google_login():
+def _start_google(intent):
     if not GOOGLE_ENABLED:
         flash("Google sign-in isn't configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.")
-        return redirect("/login")
+        return redirect("/ipadvo" if intent == "advocate" else "/login")
+    session["intent"] = intent  # remembered across the Google round-trip
     try:
         return oauth.google.authorize_redirect(_callback_url(), prompt="select_account")
     except Exception:
         app.logger.exception("Google authorize_redirect failed")
         flash("Could not reach Google. Please try again.")
-        return redirect("/login")
+        return redirect("/ipadvo" if intent == "advocate" else "/login")
+
+
+@app.get("/auth/google")
+def google_login():  # creators and content lovers
+    return _start_google("creator")
+
+
+@app.get("/auth/google/advocate")
+def google_login_advocate():  # IP advocates / lawyers, from /ipadvo
+    return _start_google("advocate")
 
 
 @app.get("/auth/google/callback")
 def google_callback():
+    intent = session.pop("intent", "creator")
+    back = "/ipadvo" if intent == "advocate" else "/login"
     if not GOOGLE_ENABLED:
-        return redirect("/login")
+        return redirect(back)
     if request.args.get("error"):  # user cancelled or Google refused
         flash("Google sign-in was cancelled.")
-        return redirect("/login")
+        return redirect(back)
     try:
         token = oauth.google.authorize_access_token()
         info = token.get("userinfo") or oauth.google.userinfo(token=token) or {}
     except Exception:
         app.logger.exception("Google token exchange failed")
         flash("Google sign-in failed. Please try again.")
-        return redirect("/login")
+        return redirect(back)
     email = (info.get("email") or "").strip().lower()
     if not email or info.get("email_verified") not in (True, "true"):
         flash("Google did not confirm that email address.")
-        return redirect("/login")
+        return redirect(back)
     u = User.query.filter_by(email=email).first()
     if u is None:
         name = (info.get("name") or email.split("@")[0])[:120]
+        if intent == "advocate" and User.query.filter_by(role="advocate", name=name).first():
+            name = f"{name} ({email})"[:120]  # advocate names must be unique; clients pick them by name
         # pw is an unused legacy column (NOT NULL in existing databases); store an unusable value
-        u = User(email=email, name=name, role="creator", pw="!google-only")
+        u = User(email=email, name=name, role=intent, pw="!google-only")
         db.session.add(u)
         db.session.commit()
-        session["onboard"] = True  # first sign-in: let them pick creator or advocate once
+    elif u.role != intent:  # keep the two doors separate; roles never change
+        flash("This Google account is registered as an IP advocate. Use the advocate sign-in." if u.role == "advocate"
+              else "This Google account is registered as a creator. Use the main sign-in.")
+        return redirect("/ipadvo" if u.role == "advocate" else "/login")
     login_user(u, remember=True)
-    return redirect("/welcome" if session.get("onboard") else "/")
-
-
-@app.route("/welcome", methods=["GET", "POST"])
-@login_required
-def welcome():
-    if not session.get("onboard"):
-        return redirect("/")
-    if request.method == "POST":
-        role = "advocate" if request.form.get("role") == "advocate" else "creator"
-        name = request.form.get("name", "").strip()[:120] or current_user.name
-        if role == "advocate" and User.query.filter(User.role == "advocate", User.name == name,
-                                                    User.id != current_user.id).first():
-            flash("An advocate or firm with that name already exists.")
-            return render_template("login.html", mode="welcome", me=current_user), 400
-        current_user.role, current_user.name = role, name
-        db.session.commit()
-        session.pop("onboard", None)
-        return redirect("/")
-    return render_template("login.html", mode="welcome", me=current_user)
+    return redirect("/")
 
 
 # ---------------- data API ----------------
