@@ -1,12 +1,14 @@
 """Manatune backend: accounts + saved creations, requests and reposts."""
-import os, re, json, time
+import os, re, json, time, secrets
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template, redirect, flash
+from flask import Flask, request, jsonify, render_template, redirect, flash, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (LoginManager, UserMixin, login_user, logout_user,
                          login_required, current_user)
 from jinja2 import ChoiceLoader, FileSystemLoader
 from sqlalchemy.exc import OperationalError
+from authlib.integrations.flask_client import OAuth
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 
 def _db_url():
@@ -20,6 +22,7 @@ def _db_url():
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, root_path=BASE)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)  # Render terminates HTTPS at its proxy
 # look in templates/ first, then the project root, so a misplaced HTML file still loads
 app.jinja_loader = ChoiceLoader([FileSystemLoader(os.path.join(BASE, "templates")), FileSystemLoader(BASE)])
 app.config.update(
@@ -132,6 +135,56 @@ def signup():
 def logout():
     logout_user()
     return redirect("/login")
+
+
+# ---------------- Google sign-in ----------------
+GOOGLE_ENABLED = bool(os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET"))
+oauth = OAuth(app)
+if GOOGLE_ENABLED:
+    oauth.register(
+        name="google",
+        client_id=os.environ["GOOGLE_CLIENT_ID"],
+        client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
+
+
+@app.context_processor
+def _inject():
+    return {"google_enabled": GOOGLE_ENABLED}
+
+
+@app.get("/auth/google")
+def google_login():
+    if not GOOGLE_ENABLED:
+        flash("Google sign-in isn't set up yet.")
+        return redirect("/login")
+    return oauth.google.authorize_redirect(url_for("google_callback", _external=True))
+
+
+@app.get("/auth/google/callback")
+def google_callback():
+    if not GOOGLE_ENABLED:
+        return redirect("/login")
+    try:
+        info = oauth.google.authorize_access_token().get("userinfo") or {}
+    except Exception:
+        flash("Google sign-in failed. Please try again.")
+        return redirect("/login")
+    email = (info.get("email") or "").strip().lower()
+    if not email or not info.get("email_verified"):
+        flash("Google did not confirm that email address.")
+        return redirect("/login")
+    u = User.query.filter_by(email=email).first()
+    if u is None:  # new Google users join as creators; advocates sign up with email
+        name = (info.get("name") or email.split("@")[0])[:120]
+        u = User(email=email, name=name, role="creator",
+                 pw=generate_password_hash(secrets.token_urlsafe(32)))
+        db.session.add(u)
+        db.session.commit()
+    login_user(u, remember=True)
+    return redirect("/")
 
 
 # ---------------- data API ----------------
