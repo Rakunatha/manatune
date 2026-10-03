@@ -23,6 +23,9 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outl
 .err{color:var(--bad);margin:0 0 4px}
 .hint{color:var(--mut);font-size:12px;margin:6px 0 0}
 form{display:none}form.on{display:block}
+.g{display:block;text-align:center;text-decoration:none;color:var(--text);background:var(--bg);border:1px solid var(--bd);border-radius:20px;padding:10px;font-weight:700}
+.g:hover{border-color:var(--blue)}
+.or{text-align:center;color:var(--mut);font-size:12px;margin:12px 0}
 </style>
 </head>
 <body>
@@ -30,6 +33,7 @@ form{display:none}form.on{display:block}
   <div class="logo">Manatune</div>
   <div class="card">
     {% for m in get_flashed_messages() %}<p class="err">{{ m }}</p>{% endfor %}
+    {% if google_enabled %}<a class="g" href="/auth/google">Continue with Google</a><div class="or">or use email</div>{% endif %}
     <div class="tabs">
       <button type="button" id="b-login" onclick="tab('login')">Sign in</button>
       <button type="button" id="b-signup" onclick="tab('signup')">Create account</button>
