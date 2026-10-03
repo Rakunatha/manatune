@@ -155,8 +155,20 @@ def state():
         reqs = Record.query.filter_by(kind="request", owner_id=uid).all()
         creations = Record.query.filter_by(kind="creation", owner_id=uid).order_by(Record.ts.desc()).all()
     reposts = Record.query.filter_by(kind="repost").order_by(Record.ts.desc()).limit(100).all()
+    rank = {"Requested": 1, "Accepted": 2, "Filed": 3}
+    prot = {}  # (creation id, owner) -> best protection status, shown on that owner's posts only
+    for q in Record.query.filter_by(kind="request"):
+        d = json.loads(q.data)
+        k = (d.get("cid"), q.owner_id)
+        if rank.get(d.get("status"), 0) > rank.get(prot.get(k), 0):
+            prot[k] = d.get("status")
+    posts = []
+    for r in reposts:
+        d = _out(r)
+        d["protection"] = prot.get((d.get("cid"), r.owner_id), "Not requested")
+        posts.append(d)
     return jsonify(creations=[_out(r) for r in creations], requests=[_out(r) for r in reqs],
-                   reposts=[_out(r) for r in reposts], advocates=advocates)
+                   reposts=posts, advocates=advocates)
 
 
 @app.post("/api/save")
@@ -172,12 +184,18 @@ def save():
         if not isinstance(m, dict) or not str(m.get("source_url", "")).startswith(("http://", "https://")):
             return jsonify(error="bad request"), 400
         m["reposted_by"] = current_user.name
+        ru = data.get("reaction_url")
+        if ru is not None and not str(ru).startswith(("http://", "https://")):
+            return jsonify(error="bad request"), 400
     r = db.session.get(Record, rid)
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"  # platform clock, not the user's
     if r is None:
+        data["server_ts"] = now
         db.session.add(Record(id=rid, kind=kind, owner_id=current_user.id, data=json.dumps(data)))
     elif r.kind != kind:
         return jsonify(error="bad request"), 400
     elif r.owner_id == current_user.id:
+        data["server_ts"] = json.loads(r.data).get("server_ts", now)
         r.data = json.dumps(data)
     elif kind == "request" and current_user.role == "advocate":
         old = json.loads(r.data)  # advocates may change status only, on requests sent to them
