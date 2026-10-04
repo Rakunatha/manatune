@@ -666,7 +666,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <a href="/">Workspace</a>
     <a href="/feed" data-p="feed">Feed</a>
     <a href="/me" data-p="me">My profile</a>
-    <a href="/assets">Library</a>
+    <a href="/provenance">Provenance</a>
     {% if me.admin %}<a href="/admin/reports" data-p="admin">Review reports</a>{% endif %}
   </nav>
   <form method="post" action="/logout" style="margin:0"><button class="btn ghost sm">Sign out</button></form>
