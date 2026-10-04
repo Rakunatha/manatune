@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Manatune",
+  "version": "0.2.0",
+  "description": "Tracks visits and downloads (metadata only) on your Manatune AI tools so you can file a provenance report.",
+  "permissions": ["downloads", "storage", "alarms"],
+  "host_permissions": [
+    "__MANATUNE_URL__/*",
+    "https://rdxper.space/*", "https://*.rdxper.space/*",
+    "https://fashiqai.com/*", "https://*.fashiqai.com/*",
+    "https://dratido.onrender.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "Manatune" }
+}
