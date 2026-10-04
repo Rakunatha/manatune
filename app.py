@@ -94,7 +94,7 @@ input[type=checkbox]{width:auto}
   <span class="brand">Manatune</span>
   <select id="asset" class="proj" aria-label="Current asset"></select>
   <form id="cmd" role="search"><input id="q" type="text" maxlength="1000" autocomplete="off" aria-label="Command bar" placeholder="What do you want to do? e.g. Find an AI tool for creating product videos"><button class="btn" id="go">Go</button></form>
-  <div class="top"><span class="sm" id="plan"></span><button id="buy">Get Creator Pass</button><a href="/feed">Feed</a> <a href="/assets">Library</a>
+  <div class="top"><a href="/feed">Feed</a> <a href="/assets">Library</a>
   <form method="post" action="/logout" style="margin:0"><button>Sign out</button></form></div>
 </header>
 <div class="layout"><nav id="stages" aria-label="Stages"></nav><main><div class="wrap" id="view" aria-live="polite"></div></main></div>
@@ -111,14 +111,13 @@ const api=async(u,b)=>{const r=await fetch(u,b===undefined?{}:{method:"POST",hea
 let stage="DISCOVER",me={},cur=null,pending="";
 function fail(e){if(e===0)return;view.querySelectorAll(".note.bad").forEach(n=>n.remove());
   const n=el("div","note bad",e.message||"Something went wrong.");
-  if(e.code===402){const b=el("button","btn","Get Creator Pass");b.onclick=buy;n.append(" ",b)}view.prepend(n)}
+  view.prepend(n)}
 async function act(b,fn){b.disabled=true;try{await fn()}catch(e){fail(e)}b.disabled=false}
 function copyBtn(text){const b=el("button","use","Copy");b.onclick=async()=>{try{await navigator.clipboard.writeText(text);b.textContent="Copied"}catch(e){b.textContent="Copy failed"}};return b}
 function dl(kind,label){
   if(me.paid){const a=el("a","use",label);a.href="/api/assets/"+cur.id+"/report/"+kind;a.download="";a.style.marginTop="14px";return a}
   const b=el("button","btn",label);b.onclick=()=>fail(Object.assign(new Error("Report downloads are part of the Creator Pass."),{code:402}));return b}
-async function loadMe(){me=await api("/api/me");
-  $("#plan").textContent=(me.paid?"Creator Pass: ":"Free: ")+me.left+" of "+me.limit+" generations left";$("#buy").hidden=me.paid}
+async function loadMe(){me=await api("/api/me")}
 async function loadAssets(id){const l=await api("/api/assets");
   sel.replaceChildren(...(l.length?l.map(a=>new Option(a.title+" ("+a.kind+")",a.id)):[new Option("No asset yet","")]));
   id=id||(cur&&cur.id)||(l[0]&&l[0].id);if(id){sel.value=id;cur=await api("/api/assets/"+id)}}
@@ -203,12 +202,6 @@ function vMonetise(){if(needAsset("Monetise","Realistic ways to earn from this a
   ((cur.meta.monetise||{}).opportunities||[]).forEach(o=>{const c=el("div","card");c.append(el("div","nm",o.model),el("div",null,"Sells: "+o.selling+" To: "+o.customer),el("div",null,o.fit),
     el("div","sm","Price: "+o.price+". Next step: "+o.next_step+". Risk: "+o.risk));view.append(c)})}
 
-async function buy(){try{const o=await api("/api/payments/create-order",{});
-  await new Promise((res,rej)=>{if(window.Razorpay)return res();const s=document.createElement("script");s.src="https://checkout.razorpay.com/v1/checkout.js";s.onload=res;s.onerror=rej;document.head.append(s)});
-  new Razorpay({key:o.key_id,order_id:o.order_id,amount:o.amount,currency:"INR",name:"Manatune",description:"Creator Pass",
-    handler:async r=>{try{await api("/api/payments/verify",r);await loadMe();show(stage)}catch(e){fail(new Error("Payment could not be verified yet. If you were charged, access unlocks shortly."))}}}).open()
-  }catch(e){fail(e.message?e:new Error("Could not start payment."))}}
-$("#buy").onclick=buy;
 (async()=>{renderNav();try{await loadMe();await loadAssets()}catch(e){}show("DISCOVER")})();
 </script>
 </body>
