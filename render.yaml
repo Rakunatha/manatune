@@ -36,11 +36,3 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: llama-3.3-70b-versatile
-      - key: FREE_GENERATIONS
-        value: "3"
-      - key: PAID_GENERATIONS
-        value: "50"
-      - key: PASS_PRICE_INR
-        value: "199"
-      - key: PASS_DAYS
-        value: "30"
