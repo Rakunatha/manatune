@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manatune</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<div class="logo">Manatune</div>
+
+<section id="connect" hidden>
+  <div class="card">
+    <p class="strong">Connect your account</p>
+    <p class="mut">Sign in on the Manatune website, open the Chrome extension page and generate a personal token. Paste it here.</p>
+    <label for="tok">Personal token</label>
+    <input id="tok" type="password" autocomplete="off" spellcheck="false" placeholder="mt_...">
+    <button class="btn" id="save">Connect</button>
+    <p class="mut"><a id="getTok" href="#" target="_blank" rel="noopener">Get a token</a></p>
+  </div>
+</section>
+
+<section id="main" hidden>
+  <div class="card">
+    <p class="mut" id="who"></p>
+    <p class="strong" id="ptitle"></p>
+    <p class="mut" id="phost"></p>
+    <p class="mut" id="psel"></p>
+    <button class="btn" id="capture">Capture record</button>
+    <p class="mut small">Saves the page details and a SHA-256 fingerprint of your selected text or image, with a server timestamp.</p>
+  </div>
+  <div class="card">
+    <label for="note">Note (optional)</label>
+    <textarea id="note" maxlength="500" placeholder="Why does this match your taste?"></textarea>
+    <button class="btn" id="repost">Repost to Manatune</button>
+    <p class="mut small">Saves a link with a preview. The original stays on its own site and is always credited.</p>
+  </div>
+</section>
+
+<p id="msg" class="msg" role="status"></p>
+<p class="mut small" id="foot" hidden><a href="#" id="out">Disconnect</a></p>
+<script type="module" src="popup.js"></script>
+</body>
+</html>
