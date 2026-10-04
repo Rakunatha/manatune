@@ -6,7 +6,7 @@ os.environ["DATABASE_URL"] = "sqlite:///" + _db
 os.environ["SECRET_KEY"] = "test"
 os.environ["ADMIN_EMAILS"] = "admin@example.com"
 os.environ["REPORT_HIDE_AT"] = "2"
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import app as appmod  # noqa: E402
 
 
